@@ -197,22 +197,17 @@ print_info "Prochaines étapes:"
 echo "1. Éditez le fichier de configuration:"
 echo "   nano $CONFIG_FILE"
 echo
-echo "2. Testez d'abord la configuration:"
+echo "2. Configurez vos informations Enphase et Envoy"
+echo
+echo "3. Testez votre configuration:"
 echo "   ./run.sh test"
 echo
-echo "3. Puis testez l'authentification:"
+echo "4. Testez l'authentification:"
 echo "   ./run.sh auth"
 echo
-echo "4. Ou lancez la démonstration complète:"
-echo "   ./run.sh demo"
-echo
-echo "5. Pour la surveillance continue:"
+echo "5. Ou lancez la surveillance continue:"
 echo "   ./run.sh monitor"
 echo
-print_info "Fichiers créés:"
-echo "  - $VENV_DIR (environnement virtuel)"
-echo "  - $CONFIG_FILE (configuration)"
-echo "  - $LAUNCHER_SCRIPT (script de lancement)"
-echo "  - $UNINSTALL_SCRIPT (désinstallation)"
-echo
 print_warning "N'oubliez pas de configurer vos identifiants dans config.py !"
+echo
+print_info "💡 Tapez './run.sh' pour voir toutes les commandes disponibles"

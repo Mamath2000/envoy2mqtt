@@ -7,10 +7,8 @@ venv/
 env/
 
 # Scripts générés par l'installation
-run_envoy_auth.sh
-run_envoy_auth.bat
+run.sh
 uninstall.sh
-uninstall.bat
 
 # Fichiers Python
 __pycache__/
@@ -37,3 +35,5 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
+node-red-flux(sample)
+code-plugin-ha
