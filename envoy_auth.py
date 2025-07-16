@@ -8,8 +8,12 @@ import requests
 import time
 import json
 import logging
+import urllib3
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
+
+# Désactiver les warnings SSL pour les certificats auto-signés de l'Envoy
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

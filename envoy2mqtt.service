@@ -1,0 +1,22 @@
+[Unit]
+Description=Envoy2MQTT Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/mamath/envoy
+Environment=PATH=/home/mamath/envoy/venv/bin
+ExecStart=/home/mamath/envoy/venv/bin/python /home/mamath/envoy/envoy2mqtt.py
+Restart=always
+RestartSec=10
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=envoy2mqtt
+
+[Install]
+WantedBy=multi-user.target
