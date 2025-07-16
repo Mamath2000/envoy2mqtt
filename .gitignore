@@ -1,0 +1,39 @@
+# Fichiers de configuration avec informations sensibles
+.env
+config.py
+
+# Environnement virtuel Python
+venv/
+env/
+
+# Scripts générés par l'installation
+run_envoy_auth.sh
+run_envoy_auth.bat
+uninstall.sh
+uninstall.bat
+
+# Fichiers Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Logs
+*.log
+
+# Fichiers temporaires
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Backup files
+*.bak
+*.backup
