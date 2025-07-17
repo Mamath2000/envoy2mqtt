@@ -76,14 +76,53 @@ class EnvoyMQTTService:
         # Dernière vérification de minuit
         self._last_midnight_check = None
 
+        if self._mqtt_client:
+            try:
+                await self._publish_status("offline")
+            except:
+                pass
+    
+    async def _midnight_reference_listener(self):
+        """Coroutine qui reste abonnée aux topics de référence et met à jour les valeurs à chaque message."""
+        topics = [f"{self.topic_data}/{sensor}_00h" for sensor in self.daily_sensors]
+        if self.teleinfo_topic:
+            topics.append(f"{self.topic_data}/teleinfo_index_00h")
+        for topic in topics:
+            await self._mqtt_client.subscribe(topic)
+            _LOGGER.info(f"🟢 Abonné à {topic} pour suivi des références minuit")
+        async with self._mqtt_client.messages() as messages:
+            async for message in messages:
+                topic = message.topic.value
+                payload = message.payload.decode()
+                _LOGGER.debug(f"📨 Message MQTT reçu sur {topic}: {payload}")
+                for sensor in self.daily_sensors:
+                    ref_topic = f"{self.topic_data}/{sensor}_00h"
+                    if topic == ref_topic:
+                        try:
+                            self.midnight_references[sensor] = float(payload)
+                            _LOGGER.info(f"🔄 Référence {sensor} mise à jour: {payload} Wh")
+                        except Exception as e:
+                            _LOGGER.error(f"❌ Erreur conversion référence {sensor}: {e}")
+                if topic == f"{self.topic_data}/teleinfo_index_00h":
+                    try:
+                        self.midnight_references['teleinfo_index'] = float(payload)
+                        _LOGGER.info(f"🔄 Référence téléinfo mise à jour: {payload} Wh")
+                    except Exception as e:
+                        _LOGGER.error(f"❌ Erreur conversion référence téléinfo: {e}")
+
+    async def _load_midnight_references(self):
+        """Initialise les références à None au démarrage (elles seront mises à jour par le listener)."""
+        _LOGGER.info("📖 Initialisation des références minuit à None (elles seront mises à jour par MQTT)")
+        for sensor in self.daily_sensors:
+            self.midnight_references[sensor] = None
+        if self.teleinfo_topic:
+            self.midnight_references['teleinfo_index'] = None
+
     async def start(self):
         """Démarrer le service MQTT."""
-        _LOGGER.info("🟢 Démarrage du service MQTT pour Envoy %s", self.serial)
-        
+        _LOGGER.info("� Démarrage du service MQTT pour Envoy %s", self.serial)
         self._running = True
-        
         async with aiohttp.ClientSession() as session:
-            # Initialiser l'API Envoy
             self._envoy_api = EnvoyAPI(
                 username=config.USERNAME,
                 password=config.PASSWORD,
@@ -91,16 +130,12 @@ class EnvoyMQTTService:
                 serial_number=self.serial,
                 session=session
             )
-            
-            # Authentifier au démarrage
             try:
                 await self._envoy_api.authenticate()
                 _LOGGER.info("✅ Authentification Envoy réussie")
             except Exception as err:
                 _LOGGER.error("❌ Échec authentification Envoy: %s", err)
                 return
-            
-            # Connecter MQTT
             mqtt_args = {
                 "hostname": self.mqtt_host,
                 "port": self.mqtt_port,
@@ -109,160 +144,24 @@ class EnvoyMQTTService:
                 mqtt_args["username"] = self.mqtt_username
             if self.mqtt_password:
                 mqtt_args["password"] = self.mqtt_password
-            
             try:
                 async with aiomqtt.Client(**mqtt_args) as mqtt_client:
                     self._mqtt_client = mqtt_client
                     _LOGGER.info("✅ Connexion MQTT réussie sur %s:%s", self.mqtt_host, self.mqtt_port)
-                    
-                    # Charger les références minuit depuis MQTT
+                    # Initialiser les références à None
                     await self._load_midnight_references()
-                    
-                    # Récupérer la valeur téléinfo actuelle si configurée
-                    if self.teleinfo_topic:
-                        await self._load_teleinfo_value()
-                    
+                    # Lancer le listener de référence minuit
+                    listener_task = asyncio.create_task(self._midnight_reference_listener())
                     # Publier un message de statut
                     await self._publish_status("online")
-                    
-                    # Démarrer les tâches de publication
+                    # Attendre que les messages retained arrivent (tempo)
+                    await asyncio.sleep(5)
+                    # Démarrer les tâches de publication (en parallèle du listener)
                     await self._run_publishing_tasks()
-                    
+                    # Annuler le listener à l'arrêt
+                    listener_task.cancel()
             except Exception as err:
                 _LOGGER.error("❌ Erreur MQTT: %s", err)
-                
-    async def stop(self):
-        """Arrêter le service."""
-        _LOGGER.info("🔴 Arrêt du service MQTT")
-        self._running = False
-        
-        if self._mqtt_client:
-            try:
-                await self._publish_status("offline")
-            except:
-                pass
-    
-    # GROS PB MATH
-    async def _load_mqtt_value(self, topic, default=None):
-        """Charge une valeur depuis MQTT avec timeout."""
-        try:
-            await self._mqtt_client.subscribe(topic)
-            _LOGGER.debug(f"📡 Souscription à {topic}")
-            
-            # Utiliser une approche avec async for au lieu de __anext__
-            timeout = 3.0
-            start_time = asyncio.get_event_loop().time()
-            
-            async with self._mqtt_client.messages() as messages:
-                async for message in messages:
-                    if asyncio.get_event_loop().time() - start_time > timeout:
-                        _LOGGER.debug(f"⏰ Timeout {timeout}s atteint pour {topic}")
-                        break
-                        
-                    if message.topic.value == topic and message.payload:
-                        _LOGGER.debug(f"📨 Message reçu de {topic}")
-                        await self._mqtt_client.unsubscribe(topic)
-                        return message.payload.decode()
-                        
-            await self._mqtt_client.unsubscribe(topic)
-            return default
-            
-        except Exception as e:
-            _LOGGER.error(f"❌ Erreur lecture MQTT {topic}: {e}")
-            return default
-
-    async def _load_midnight_references(self):
-        """Charger les références minuit depuis les topics MQTT retained."""
-        _LOGGER.info("📖 Chargement des références minuit depuis MQTT...")
-        
-        # Pour chaque capteur journalier
-        for sensor in self.daily_sensors:
-            topic = f"{self.topic_data}/{sensor}_00h"
-            try:
-                payload = await self._load_mqtt_value(topic)
-                if payload:
-                    value = float(payload)
-                    self.midnight_references[sensor] = value
-                    _LOGGER.info("✅ Référence %s chargée: %.2f Wh", sensor, value)
-                else:
-                    self.midnight_references[sensor] = None
-                    _LOGGER.warning("⚠️ Pas de référence pour %s - sera créée", sensor)
-                    
-            except (ValueError, TypeError) as err:
-                _LOGGER.error("❌ Erreur chargement référence %s: %s - sera créée", sensor, err)
-                self.midnight_references[sensor] = None
-        
-        # Charger la référence téléinfo si configurée
-        if self.teleinfo_topic:
-            topic = f"{self.topic_data}/teleinfo_index_00h"
-            try:
-                payload = await self._load_mqtt_value(topic)
-                if payload:
-                    value = float(payload)
-                    self.midnight_references['teleinfo_index'] = value
-                    _LOGGER.info("✅ Référence téléinfo chargée: %.0f Wh", value)
-                else:
-                    self.midnight_references['teleinfo_index'] = None
-                    _LOGGER.warning("⚠️ Pas de référence téléinfo - sera créée")
-                    
-            except (ValueError, TypeError) as err:
-                _LOGGER.error("❌ Erreur chargement référence téléinfo: %s - sera créée", err)
-                self.midnight_references['teleinfo_index'] = None
-
-    async def _load_teleinfo_value(self):
-        """Charger la valeur téléinfo actuelle depuis MQTT."""
-        if not self.teleinfo_topic:
-            _LOGGER.info("🔧 Téléinfo non configuré (TELEINFO_TOPIC non défini)")
-            return
-            
-        _LOGGER.info("📖 Chargement valeur téléinfo depuis %s...", self.teleinfo_topic)
-        
-        try:
-            payload = await self._load_mqtt_value(self.teleinfo_topic)
-            if payload:
-                _LOGGER.debug("📋 Payload téléinfo: %s", payload[:200] + "..." if len(payload) > 200 else payload)
-                
-                # Le téléinfo est en JSON TIC mode standard
-                try:
-                    data = json.loads(payload)
-                    _LOGGER.debug("✅ JSON téléinfo parsé avec succès, %d champs", len(data))
-                    
-                    # L'index se trouve dans EAST.value
-                    if 'EAST' in data and 'value' in data['EAST']:
-                        self.teleinfo_index = float(data['EAST']['value'])
-                        _LOGGER.info("✅ Téléinfo chargé: %.0f Wh", self.teleinfo_index)
-                    else:
-                        available_fields = list(data.keys())[:10]  # Premiers 10 champs
-                        _LOGGER.warning("⚠️ Champ EAST.value non trouvé. Champs disponibles: %s", available_fields)
-                        self.teleinfo_index = None
-                except (json.JSONDecodeError, ValueError, KeyError) as e:
-                    _LOGGER.error("❌ Erreur parsing téléinfo JSON: %s", e)
-                    _LOGGER.debug("❌ Payload brut: %s", payload)
-                    self.teleinfo_index = None
-            else:
-                _LOGGER.warning("⚠️ Aucune valeur téléinfo reçue")
-                self.teleinfo_index = None
-                
-        except Exception as err:
-            _LOGGER.error("❌ Erreur chargement téléinfo: %s", err)
-            self.teleinfo_index = None
-
-    async def _refresh_teleinfo_value(self):
-        """Rafraîchir la valeur téléinfo actuelle."""
-        if not self.teleinfo_topic:
-            return
-            
-        try:
-            payload = await self._load_mqtt_value(self.teleinfo_topic)
-            if payload:
-                try:
-                    data = json.loads(payload)
-                    # L'index se trouve dans EAST.value
-                    if 'EAST' in data and 'value' in data['EAST']:
-                        new_value = float(data['EAST']['value'])
-                        old_value = self.teleinfo_index
-                        self.teleinfo_index = new_value
-                        if old_value != new_value:
                             _LOGGER.debug("📊 Téléinfo mis à jour: %.0f → %.0f Wh", old_value or 0, new_value)
                     else:
                         _LOGGER.debug("⚠️ EAST.value non trouvé lors du rafraîchissement")
@@ -433,55 +332,33 @@ class EnvoyMQTTService:
     async def _publish_full_data_loop(self):
         """Publier les données complètes toutes les minutes."""
         _LOGGER.info("📈 Démarrage publication données complètes (60s)")
-        
         while self._running:
             try:
                 start_time = time.time()
-                
                 # Récupérer toutes les données
                 full_data = await self._envoy_api.get_all_envoy_data()
-                
-                # Rafraîchir la valeur téléinfo
-                if self.teleinfo_topic:
-                    await self._refresh_teleinfo_value()
-                
                 # Initialiser les références manquantes (premier démarrage)
                 await self._initialize_missing_references(full_data)
-                
                 # Vérifier et mettre à jour les références minuit si nécessaire
                 await self._check_and_update_midnight_references(full_data)
-                
                 # Calculer les valeurs journalières
                 daily_values = self._calculate_daily_values(full_data)
-                
                 # Publier chaque champ dans un topic séparé
                 for field, value in full_data.items():
                     topic = f"{self.topic_data}/{field}"
                     await self._mqtt_client.publish(topic, json.dumps(value), retain=True)
-                
                 # Publier les valeurs journalières
                 for field, value in daily_values.items():
                     topic = f"{self.topic_data}/{field}"
                     await self._mqtt_client.publish(topic, str(value), retain=True)
-                
-                # # Publier également en JSON complet
-                # await self._mqtt_client.publish(
-                #     f"{self.topic_data}/json", 
-                #     json.dumps(full_data)
-                # )
-                
                 total_fields = len(full_data) + len(daily_values)
                 _LOGGER.info("✅ Données complètes publiées (%d champs + %d journaliers)", len(full_data), len(daily_values))
-                
                 # Calculer le temps d'attente pour maintenir 1 minute
                 elapsed = time.time() - start_time
                 sleep_time = max(0, 60.0 - elapsed)
-                
                 if elapsed > 30.0:
                     _LOGGER.warning("⏰ Récupération données complètes lente: %.2fs", elapsed)
-                
                 await asyncio.sleep(sleep_time)
-                
             except Exception as err:
                 _LOGGER.error("❌ Erreur publication données complètes: %s", err)
                 await asyncio.sleep(60)
