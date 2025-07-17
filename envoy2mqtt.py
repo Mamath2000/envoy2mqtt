@@ -16,7 +16,7 @@ import urllib3
 from typing import Dict, Any, Optional
 
 import aiohttp
-import asyncio_mqtt as aiomqtt
+import aiomqtt
 
 from envoy_api import EnvoyAPI
 import config
@@ -37,9 +37,9 @@ class EnvoyMQTTService:
 
     def __init__(self):
         """Initialise le service MQTT Envoy"""
-        self.envoy_api = None
-        self.mqtt_client = None
-        self.running = False
+        self._envoy_api = None
+        self._mqtt_client = None
+        self._running = False
         
         # Configuration MQTT depuis config.py
         self.mqtt_host = config.MQTT_HOST
@@ -48,6 +48,9 @@ class EnvoyMQTTService:
         self.mqtt_password = config.MQTT_PASSWORD
         self.base_topic = config.MQTT_BASE_TOPIC
         self.serial = config.SERIAL_NUMBER
+        
+        # Configuration des intervalles
+        self.raw_data_interval = getattr(config, 'RAW_DATA_INTERVAL_SECONDS', 1)
         
         # Construction des topics MQTT
         self.topic_raw = f"{self.base_topic}/{self.serial}/raw"
@@ -62,9 +65,9 @@ class EnvoyMQTTService:
         async with aiohttp.ClientSession() as session:
             # Initialiser l'API Envoy
             self._envoy_api = EnvoyAPI(
-                username=self.username,
-                password=self.password,
-                envoy_host=self.envoy_host,
+                username=config.USERNAME,
+                password=config.PASSWORD,
+                envoy_host=config.LOCAL_ENVOY_URL,
                 serial_number=self.serial,
                 session=session
             )
@@ -114,10 +117,16 @@ class EnvoyMQTTService:
 
     async def _run_publishing_tasks(self):
         """Exécuter les tâches de publication en parallèle."""
-        tasks = [
-            asyncio.create_task(self._publish_raw_data_loop()),
-            asyncio.create_task(self._publish_full_data_loop()),
-        ]
+        tasks = []
+        
+        # Ajouter la tâche de données brutes seulement si l'intervalle > 0
+        if self.raw_data_interval > 0:
+            tasks.append(asyncio.create_task(self._publish_raw_data_loop()))
+        else:
+            _LOGGER.info("📊 Publication données brutes désactivée (RAW_DATA_INTERVAL_SECONDS = 0)")
+        
+        # Toujours ajouter la tâche de données complètes
+        tasks.append(asyncio.create_task(self._publish_full_data_loop()))
         
         try:
             await asyncio.gather(*tasks)
@@ -127,8 +136,8 @@ class EnvoyMQTTService:
             _LOGGER.error("❌ Erreur dans les tâches de publication: %s", err)
 
     async def _publish_raw_data_loop(self):
-        """Publier les données brutes toutes les 1 seconde."""
-        _LOGGER.info("📊 Démarrage publication données brutes (1s)")
+        """Publier les données brutes selon l'intervalle configuré."""
+        _LOGGER.info("📊 Démarrage publication données brutes (%ss)", self.raw_data_interval)
         
         while self._running:
             try:
@@ -142,24 +151,25 @@ class EnvoyMQTTService:
                     topic = f"{self.topic_raw}/{field}"
                     await self._mqtt_client.publish(topic, json.dumps(value))
                 
-                # Publier également en JSON complet
-                await self._mqtt_client.publish(
-                    f"{self.topic_raw}/json", 
-                    json.dumps(raw_data)
-                )
+
+                # # Publier également en JSON complet
+                # await self._mqtt_client.publish(
+                #     f"{self.topic_raw}/json", 
+                #     json.dumps(raw_data)
+                # )
                 
-                # Calculer le temps d'attente pour maintenir 1Hz
+                # Calculer le temps d'attente pour maintenir l'intervalle configuré
                 elapsed = time.time() - start_time
-                sleep_time = max(0, 1.0 - elapsed)
+                sleep_time = max(0, self.raw_data_interval - elapsed)
                 
-                if elapsed > 1.0:
-                    _LOGGER.warning("⏰ Récupération données brutes lente: %.2fs", elapsed)
+                if elapsed > self.raw_data_interval:
+                    _LOGGER.warning("⏰ Récupération données brutes lente: %.2fs (intervalle: %ss)", elapsed, self.raw_data_interval)
                 
                 await asyncio.sleep(sleep_time)
                 
             except Exception as err:
                 _LOGGER.error("❌ Erreur publication données brutes: %s", err)
-                await asyncio.sleep(1)
+                await asyncio.sleep(self.raw_data_interval)
 
     async def _publish_full_data_loop(self):
         """Publier les données complètes toutes les minutes."""
@@ -175,13 +185,13 @@ class EnvoyMQTTService:
                 # Publier chaque champ dans un topic séparé
                 for field, value in full_data.items():
                     topic = f"{self.topic_data}/{field}"
-                    await self._mqtt_client.publish(topic, json.dumps(value))
+                    await self._mqtt_client.publish(topic, json.dumps(value), retain=True)
                 
-                # Publier également en JSON complet
-                await self._mqtt_client.publish(
-                    f"{self.topic_data}/json", 
-                    json.dumps(full_data)
-                )
+                # # Publier également en JSON complet
+                # await self._mqtt_client.publish(
+                #     f"{self.topic_data}/json", 
+                #     json.dumps(full_data)
+                # )
                 
                 _LOGGER.info("✅ Données complètes publiées (%d champs)", len(full_data))
                 
@@ -201,62 +211,25 @@ class EnvoyMQTTService:
     async def _publish_status(self, status: str):
         """Publier le statut du service."""
         if self._mqtt_client:
-            status_data = {
-                "status": status,
-                "timestamp": int(time.time()),
-                "serial": self.serial
-            }
+            # status_data = {
+            #     "status": status,
+            #     "timestamp": int(time.time())
+            # }
             
             await self._mqtt_client.publish(
-                f"{self.base_topic}/{self.serial}/status",
-                json.dumps(status_data),
+                f"{self.base_topic}/{self.serial}/lwt",
+                status,
                 retain=True
             )
             
             _LOGGER.info("📡 Statut publié: %s", status)
 
 
-def load_config():
-    """Charger la configuration depuis config.py."""
-    try:
-        import config
-        return {
-            'username': config.USERNAME,
-            'password': config.PASSWORD,
-            'serial_number': config.SERIAL_NUMBER,
-            'envoy_host': config.LOCAL_ENVOY_URL,
-            'mqtt_host': getattr(config, 'MQTT_HOST', 'localhost'),
-            'mqtt_port': getattr(config, 'MQTT_PORT', 1883),
-            'mqtt_username': getattr(config, 'MQTT_USERNAME', None),
-            'mqtt_password': getattr(config, 'MQTT_PASSWORD', None),
-        }
-    except ImportError:
-        _LOGGER.error("❌ Fichier config.py non trouvé")
-        return None
-    except AttributeError as e:
-        _LOGGER.error("❌ Configuration incomplète: %s", e)
-        return None
-
 
 async def main():
     """Fonction principale."""
-    # Charger la configuration
-    config_data = load_config()
-    if not config_data:
-        print("❌ Impossible de charger la configuration")
-        sys.exit(1)
-    
-    # Créer le service
-    service = EnvoyMQTTService(
-        username=config_data['username'],
-        password=config_data['password'],
-        envoy_host=config_data['envoy_host'],
-        serial_number=config_data['serial_number'],
-        mqtt_host=config_data['mqtt_host'],
-        mqtt_port=config_data['mqtt_port'],
-        mqtt_username=config_data['mqtt_username'],
-        mqtt_password=config_data['mqtt_password'],
-    )
+    # Créer le service (utilise automatiquement config.py)
+    service = EnvoyMQTTService()
     
     # Gestionnaire de signaux pour arrêt propre
     def signal_handler(signum, frame):

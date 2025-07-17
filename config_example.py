@@ -24,6 +24,7 @@ MQTT_BASE_TOPIC = "envoy"             # Topic de base MQTT (ex: envoy/{serial}/d
 
 # Paramètres optionnels
 REFRESH_INTERVAL_MINUTES = 10  # Intervalle de rafraîchissement du token
+RAW_DATA_INTERVAL_SECONDS = 1  # Intervalle de publication des données brutes (en secondes, 0 = désactivé)
 LOG_LEVEL = "INFO"             # DEBUG, INFO, WARNING, ERROR
 
 # Exemples d'URLs Envoy typiques:

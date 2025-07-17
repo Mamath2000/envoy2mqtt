@@ -1,4 +1,4 @@
 requests>=2.25.0
 urllib3>=1.26.0
 aiohttp>=3.8.0
-asyncio-mqtt>=0.11.0
+aiomqtt>=1.0.0

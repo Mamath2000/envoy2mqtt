@@ -270,10 +270,28 @@ class EnvoyAPI:
                 
                 if response.status == 200:
                     try:
+                        # Vérifier le Content-Type
+                        content_type = response.headers.get('content-type', '').lower()
+                        if 'application/json' not in content_type:
+                            text_data = await response.text()
+                            try:
+                                return json.loads(text_data)
+                            except Exception as e:
+                                _LOGGER.warning("⚠️ Réponse non-JSON de %s (Réponse: %s)", endpoint, text_data[:200])
+                                raise aiohttp.ClientError(
+                                    f"Content-Type inattendu pour {endpoint}: {content_type}. "
+                                    f"Impossible de parser en JSON: {e}. Réponse: {text_data[:200]}"
+                                )
+                        
                         return await response.json()
-                    except json.JSONDecodeError:
+                    except aiohttp.ContentTypeError as e:
                         text_data = await response.text()
-                        raise aiohttp.ClientError(f"Réponse non-JSON de {endpoint}: {text_data[:100]}")
+                        _LOGGER.warning("⚠️ Erreur ContentType sur %s: %s", endpoint, str(e))
+                        raise aiohttp.ClientError(f"ContentType invalide pour {endpoint}: {str(e)}. Réponse: {text_data[:200]}")
+                    except json.JSONDecodeError as e:
+                        text_data = await response.text()
+                        _LOGGER.warning("⚠️ JSON invalide sur %s: %s", endpoint, str(e))
+                        raise aiohttp.ClientError(f"JSON invalide pour {endpoint}: {str(e)}. Réponse: {text_data[:200]}")
                         
                 elif response.status == 401:
                     # Token expiré, ré-authentifier et retry
@@ -371,8 +389,7 @@ class EnvoyAPI:
                 "conso_all_eim_wNow": total_consumption.get("currW", 0),
                 "conso_net_eim_wNow": net_consumption_meter.get("instantaneousDemand", 0),
                 "prod_eim_wNow": production_meter.get("instantaneousDemand", 0),
-                "timestamp": int(time.time()),
-                "serial": self.serial_number
+                "timestamp": int(time.time())
             }
 
             return raw_data
@@ -419,7 +436,6 @@ class EnvoyAPI:
             
             # Métadonnées
             processed_data["timestamp"] = int(time.time())
-            processed_data["serial"] = self.serial_number
 
             return processed_data
             
