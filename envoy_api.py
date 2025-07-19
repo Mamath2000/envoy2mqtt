@@ -438,6 +438,7 @@ class EnvoyAPI:
             
             # Métadonnées
             processed_data["timestamp"] = int(time.time())
+            processed_data["timestamp_text"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             return processed_data
             
