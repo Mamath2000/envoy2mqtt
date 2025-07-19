@@ -50,9 +50,6 @@ class EnvoyMQTTService:
         self.base_topic = config.MQTT_BASE_TOPIC
         self.serial = config.SERIAL_NUMBER
         
-        # Configuration téléinfo
-        self.teleinfo_topic = getattr(config, 'TELEINFO_TOPIC', None)
-        
         # Configuration des intervalles
         self.raw_data_interval = getattr(config, 'RAW_DATA_INTERVAL_SECONDS', 1)
         
@@ -64,51 +61,46 @@ class EnvoyMQTTService:
         self.daily_sensors = [
             'conso_all_eim_whLifetime',
             'conso_net_eim_whLifetime', 
-            'prod_eim_whLifetime'
+            'prod_eim_whLifetime',
+            'grid_eim_whLifetime',
+            'eco_eim_whLifetime',
         ]
         
         # Stockage des références minuit (chargées depuis MQTT)
         self.midnight_references = {}
         
-        # Valeur téléinfo actuelle
-        self.teleinfo_index = None
-        
         # Dernière vérification de minuit
         self._last_midnight_check = None
 
-    async def _midnight_reference_listener(self):
-        """Coroutine qui reste abonnée aux topics de référence et met à jour les valeurs à chaque message."""
-        topics = [f"{self.topic_data}/{sensor}_00h" for sensor in self.daily_sensors]
-        if self.teleinfo_topic:
-            topics.append(f"{self.topic_data}/teleinfo_index_00h")
+        self._retained_received = asyncio.Event()
 
-        for topic in topics:
+    async def _midnight_reference_listener(self):
+        """Écoute les messages retained sur les topics de référence minuit et met à jour les valeurs."""
+        for sensor in self.daily_sensors:
+            topic = f"{self.topic_data}/{sensor}_00h"
             await self._mqtt_client.subscribe(topic)
             _LOGGER.info(f"🟢 Abonné à {topic} pour suivi des références minuit")
 
-        async with self._mqtt_client.messages() as messages:
-            async for message in messages:
-                topic = message.topic.value
-                payload = message.payload.decode()
-                _LOGGER.debug(f"📨 Message MQTT reçu sur {topic}: {payload}")
-                for sensor in self.daily_sensors:
-                    ref_topic = f"{self.topic_data}/{sensor}_00h"
-                    if topic == ref_topic:
-                        try:
-                            self.midnight_references[sensor] = float(payload)
-                            _LOGGER.info(f"🔄 Référence {sensor} mise à jour: {payload} Wh")
-                        except Exception as e:
-                            _LOGGER.error(f"❌ Erreur conversion référence {sensor}: {e}")
-                if topic == f"{self.topic_data}/teleinfo_index_00h":
+        async for message in self._mqtt_client.messages:
+            topic = message.topic.value
+            payload = message.payload.decode()
+            _LOGGER.info(f"📨 Message MQTT reçu sur {topic}: {payload}")
+            for sensor in self.daily_sensors:
+                ref_topic = f"{self.topic_data}/{sensor}_00h"
+                if topic == ref_topic:
                     try:
-                        self.midnight_references['teleinfo_index'] = float(payload)
-                        _LOGGER.info(f"🔄 Référence téléinfo mise à jour: {payload} Wh")
+                        self.midnight_references[sensor] = float(payload)
+                        _LOGGER.info(f"🔄 Référence {sensor} mise à jour: {payload} Wh")
                     except Exception as e:
-                        _LOGGER.error(f"❌ Erreur conversion référence téléinfo: {e}")
+                        _LOGGER.error(f"❌ Erreur conversion référence {sensor}: {e}")
+            # Optionnel : lever l'événement si tous les sensors sont reçus
+            if all(self.midnight_references.get(s) is not None for s in self.daily_sensors):
+                self._retained_received.set()
+                break
 
     async def start(self):
         """Démarrer le service MQTT."""
-        _LOGGER.info("� Démarrage du service MQTT pour Envoy %s", self.serial)
+        _LOGGER.info("🚀 Démarrage du service MQTT pour Envoy %s", self.serial)
         self._running = True
         async with aiohttp.ClientSession() as session:
             self._envoy_api = EnvoyAPI(
@@ -143,89 +135,64 @@ class EnvoyMQTTService:
                     # Publier un message de statut
                     await self._publish_status("online")
 
-                    # Initialiser les références à None
-                    for sensor in self.daily_sensors:
-                        self.midnight_references[sensor] = None
-                    if self.teleinfo_topic:
-                        self.midnight_references['teleinfo_index'] = None
-                    
                     # Lancer le listener de référence minuit
                     listener_task = asyncio.create_task(self._midnight_reference_listener())
-                    # Attendre que les messages retained arrivent (tempo)
-                    await asyncio.sleep(5)
-                    # Démarrer les tâches de publication (en parallèle du listener)
+                    await self._retained_received.wait()  # Attendre que le listener ait reçu les retained
+
+                    await self._initialize_missing_references(await self._envoy_api.get_all_envoy_data())
+
                     await self._run_publishing_tasks()
-                    # Annuler le listener à l'arrêt
                     listener_task.cancel()
 
             except Exception as err:
                 _LOGGER.error("❌ Erreur MQTT: %s", err)
 
     async def _initialize_missing_references(self, current_data: Dict[str, Any]):
-        """Initialiser les références manquantes avec les valeurs actuelles."""
+        """Initialiser les références manquantes avec les valeurs actuelles (sans écraser celles déjà présentes)."""
         for sensor in self.daily_sensors:
+            # Ne modifie QUE si la référence est absente
             if sensor in current_data and self.midnight_references.get(sensor) is None:
                 value = current_data[sensor]
                 self.midnight_references[sensor] = value
-                
                 # Publier la nouvelle référence (retained)
                 topic = f"{self.topic_data}/{sensor}_00h"
                 await self._mqtt_client.publish(topic, str(value), retain=True)
-                
                 _LOGGER.info("🆕 Nouvelle référence créée %s: %.2f Wh", sensor, value)
-        
-        # Initialiser la référence téléinfo si manquante
-        if self.teleinfo_index is not None and self.midnight_references.get('teleinfo_index') is None:
-            self.midnight_references['teleinfo_index'] = self.teleinfo_index
-            
-            # Publier la référence téléinfo (retained)
-            topic = f"{self.topic_data}/teleinfo_index_00h"
-            await self._mqtt_client.publish(topic, str(self.teleinfo_index), retain=True)
-            
-            _LOGGER.info("🆕 Nouvelle référence téléinfo créée: %.0f Wh", self.teleinfo_index)
+            else:
+                # Log pour debug
+                _LOGGER.debug("Référence %s déjà présente (%.2f Wh), conservée", sensor, self.midnight_references.get(sensor))
 
     async def _check_and_update_midnight_references(self, current_data: Dict[str, Any]):
         """Vérifier si on est à minuit et mettre à jour les références."""
         now = datetime.now()
         current_date = now.date()
-        
-        # Vérifier si on est passé minuit depuis la dernière vérification
-        if self._last_midnight_check is None or self._last_midnight_check < current_date:
-            is_near_midnight = now.time() <= dt_time(0, 5)  # Dans les 5 premières minutes
-            
-            if is_near_midnight or self._last_midnight_check is None:
-                _LOGGER.info("🕛 Mise à jour des références minuit...")
+        is_near_midnight = now.time() <= dt_time(0, 5)  # Dans les 5 premières minutes
 
-                # Sauvegarder les valeurs journalières dans _yesterday
-                daily_values = self._calculate_daily_values(current_data)
-                for sensor, value in daily_values.items():
-                    yesterday_field = sensor.replace('_today', '_yesterday')
-                    self.midnight_references[yesterday_field] = value
-                    topic = f"{self.topic_data}/{yesterday_field}"
+        # Mise à jour UNIQUEMENT si on est passé minuit depuis la dernière vérification
+        if is_near_midnight and (self._last_midnight_check is None or self._last_midnight_check < current_date):
+            _LOGGER.info("🕛 Mise à jour des références minuit...")
+
+            # Sauvegarder les valeurs journalières dans _yesterday
+            daily_values = self._calculate_daily_values(current_data)
+            for sensor, value in daily_values.items():
+                yesterday_field = sensor.replace('_today', '_yesterday')
+                self.midnight_references[yesterday_field] = value
+                topic = f"{self.topic_data}/{yesterday_field}"
+                await self._mqtt_client.publish(topic, str(value), retain=True)
+                _LOGGER.info("🕛 Valeur d'hier sauvegardée %s: %.2f Wh", yesterday_field, value)
+            
+            for sensor in self.daily_sensors:
+                if sensor in current_data:
+                    value = current_data[sensor]
+                    self.midnight_references[sensor] = value
+                    
+                    # Publier la nouvelle référence (retained)
+                    topic = f"{self.topic_data}/{sensor}_00h"
                     await self._mqtt_client.publish(topic, str(value), retain=True)
-                    _LOGGER.info("🕛 Valeur d'hier sauvegardée %s: %.2f Wh", yesterday_field, value)
-                
-                for sensor in self.daily_sensors:
-                    if sensor in current_data:
-                        value = current_data[sensor]
-                        self.midnight_references[sensor] = value
-                        
-                        # Publier la nouvelle référence (retained)
-                        topic = f"{self.topic_data}/{sensor}_00h"
-                        await self._mqtt_client.publish(topic, str(value), retain=True)
-                        
-                        _LOGGER.info("✅ Nouvelle référence %s: %.2f Wh", sensor, value)
-                
-                # Mettre à jour la référence téléinfo si disponible
-                if self.teleinfo_index is not None:
-                    self.midnight_references['teleinfo_index'] = self.teleinfo_index
                     
-                    topic = f"{self.topic_data}/teleinfo_index_00h"
-                    await self._mqtt_client.publish(topic, str(self.teleinfo_index), retain=True)
-                    
-                    _LOGGER.info("✅ Nouvelle référence téléinfo: %.0f Wh", self.teleinfo_index)
-                
-                self._last_midnight_check = current_date
+                    _LOGGER.info("✅ Nouvelle référence %s: %.2f Wh", sensor, value)
+            
+            self._last_midnight_check = current_date
 
     def _calculate_daily_values(self, current_data: Dict[str, Any]) -> Dict[str, float]:
         """Calculer les valeurs journalières depuis minuit."""
@@ -241,34 +208,21 @@ class EnvoyMQTTService:
                 # Créer le nom du capteur journalier
                 daily_sensor_name = sensor.replace('_whLifetime', '_today')
                 daily_values[daily_sensor_name] = max(0, daily_value)  # Éviter les valeurs négatives
+                _LOGGER.info("📊 %s: %.2f Wh (actuel: %.2f, minuit: %.2f)", daily_sensor_name, daily_values[daily_sensor_name], current_value, midnight_ref)
         
-        # Calculs des capteurs dérivés (grid_eim_today et eco_eim_today)
-        conso_all_today = daily_values.get('conso_all_eim_today')
-        conso_net_today = daily_values.get('conso_net_eim_today')
+        # # Calculs des capteurs dérivés (grid_eim_today et eco_eim_today)
+        # conso_all_today = daily_values.get('conso_all_eim_today')
+        # conso_net_today = daily_values.get('conso_net_eim_today')
         
-        # Debug téléinfo
-        _LOGGER.debug("📊 État téléinfo - index: %s, ref: %s", 
-                     self.teleinfo_index, 
-                     self.midnight_references.get('teleinfo_index'))
+        # # eco_eim_today = conso_all_today (autoconsommation)
+        # if conso_all_today is not None:
+        #     daily_values['eco_eim_today'] = max(0, conso_all_today)
+        #     _LOGGER.debug("📊 eco_eim_today: %.2f Wh", daily_values['eco_eim_today'])
         
-        # Calculer conso_grid_today (téléinfo) si disponible
-        conso_grid_today = None
-        if (self.teleinfo_index is not None and 
-            self.midnight_references.get('teleinfo_index') is not None):
-            conso_grid_today = max(0, self.teleinfo_index - self.midnight_references['teleinfo_index'])
-            _LOGGER.debug("📊 Téléinfo journalier calculé: %.2f Wh", conso_grid_today)
-        else:
-            _LOGGER.debug("⚠️ Téléinfo indisponible pour calculs journaliers")
-        
-        # eco_eim_today = conso_all_today - conso_grid_today (autoconsommation)
-        if conso_all_today is not None and conso_grid_today is not None:
-            daily_values['eco_eim_today'] = max(0, conso_all_today - conso_grid_today)
-            _LOGGER.debug("📊 eco_eim_today: %.2f Wh", daily_values['eco_eim_today'])
-        
-        # grid_eim_today = conso_grid_today - conso_net_today (import réseau)
-        if conso_grid_today is not None and conso_net_today is not None:
-            daily_values['grid_eim_today'] = max(0, conso_grid_today - conso_net_today)
-            _LOGGER.debug("📊 grid_eim_today: %.2f Wh", daily_values['grid_eim_today'])
+        # # grid_eim_today = conso_net_today (import réseau)
+        # if conso_net_today is not None:
+        #     daily_values['grid_eim_today'] = max(0, conso_net_today)
+        #     _LOGGER.debug("📊 grid_eim_today: %.2f Wh", daily_values['grid_eim_today'])
         
         return daily_values
 
@@ -365,17 +319,11 @@ class EnvoyMQTTService:
     async def _publish_status(self, status: str):
         """Publier le statut du service."""
         if self._mqtt_client:
-            # status_data = {
-            #     "status": status,
-            #     "timestamp": int(time.time())
-            # }
-            
             await self._mqtt_client.publish(
                 f"{self.base_topic}/{self.serial}/lwt",
                 status,
                 retain=True
             )
-            
             _LOGGER.info("📡 Statut publié: %s", status)
 
     async def stop(self):
@@ -383,7 +331,7 @@ class EnvoyMQTTService:
         self._running = False
         if self._mqtt_client:
             try:
-                await self._publish_status("offline")
+                await asyncio.wait_for(self._publish_status("offline"), timeout=2)
             except Exception as err:
                 _LOGGER.warning("Impossible de publier le statut offline : %s", err)
         _LOGGER.info("🛑 Service arrêté proprement")
@@ -391,10 +339,8 @@ class EnvoyMQTTService:
 
 async def main():
     """Fonction principale."""
-    # Créer le service (utilise automatiquement config.py)
     service = EnvoyMQTTService()
     
-    # Gestionnaire de signaux pour arrêt propre
     def signal_handler(signum, frame):
         _LOGGER.info("Signal %s reçu, arrêt du service...", signum)
         loop = asyncio.get_event_loop()
