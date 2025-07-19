@@ -102,3 +102,198 @@ Si vous voyez ces messages, tout fonctionne correctement :
 - `📡 Statut publié: online`
 - `📊 Démarrage publication données brutes (1s)`
 - `📈 Démarrage publication données complètes (60s)`
+
+# EnvoyAPI – Documentation de la classe
+
+La classe `EnvoyAPI` permet d’interagir avec la passerelle Enphase Envoy S via son API locale et l’API Enlighten. Elle gère l’authentification, la récupération des données et le rafraîchissement du token.
+
+## Attributs principaux
+
+- `username`, `password` : Identifiants Enlighten
+- `envoy_host` : Adresse locale de la passerelle
+- `serial_number` : Numéro de série Envoy
+- `_session` : Session HTTP aiohttp
+
+## Méthodes principales
+
+### `async authenticate()`
+**Rôle** : Authentifie l’utilisateur auprès de l’API Enlighten et récupère un token JWT pour les requêtes locales.
+
+**Paramètres** : Aucun  
+**Retour** : None (met à jour l’état interne du client)
+
+**Exemple d’appel** :
+```python
+await api.authenticate()
+```
+
+---
+
+### `async get_raw_data()`
+**Rôle** : Récupère les données brutes de production et de consommation depuis la passerelle.
+
+**Paramètres** : Aucun  
+**Retour** : `Dict[str, Any]`
+
+**Exemple d’appel** :
+```python
+raw = await api.get_raw_data()
+print(raw["production"])
+```
+**Exemple de sortie** :
+```python
+{
+    "production": 1234.5,
+    "consumption": 678.9,
+    "timestamp": 1721460000
+}
+```
+
+---
+
+### `async get_all_envoy_data()`
+**Rôle** : Récupère toutes les données consolidées : production, consommation nette, énergie injectée, etc.
+
+**Paramètres** : Aucun  
+**Retour** : `Dict[str, Any]`
+
+**Exemple d’appel** :
+```python
+data = await api.get_all_envoy_data()
+print(data["prod_eim_whLifetime"])
+```
+**Exemple de sortie** :
+```python
+{
+    "prod_eim_whLifetime": 9354611.767,
+    "conso_all_eim_whLifetime": 33253406.226,
+    "conso_net_eim_whLifetime": 23899915.788,
+    "grid_eim_whLifetime": 2126308.666,
+    "eco_eim_whLifetime": 7242918.837,
+    "timestamp": 1721460000
+}
+```
+
+---
+
+### `async refresh_token()`
+**Rôle** : Rafraîchit le token JWT si nécessaire (selon l’intervalle défini).
+
+**Paramètres** : Aucun  
+**Retour** : None
+
+**Exemple d’appel** :
+```python
+await api.refresh_token()
+```
+
+---
+
+### `async get_meters_info()`
+**Rôle** : Retourne les informations sur les compteurs connectés à la passerelle (EID, type, etc.).
+
+**Paramètres** : Aucun  
+**Retour** : `List[Dict[str, Any]]`
+
+**Exemple d’appel** :
+```python
+meters = await api.get_meters_info()
+for meter in meters:
+    print(meter["type"], meter["eid"])
+```
+**Exemple de sortie** :
+```python
+[
+    {"eid": 704643328, "type": "production", "state": "active"},
+    {"eid": 704643584, "type": "net-consumption", "state": "active"}
+]
+```
+
+---
+
+### `async get_status()`
+**Rôle** : Retourne le statut actuel de la passerelle (connectivité, état, erreurs éventuelles).
+
+**Paramètres** : Aucun  
+**Retour** : `Dict[str, Any]`
+
+**Exemple d’appel** :
+```python
+status = await api.get_status()
+print(status["status"])
+```
+**Exemple de sortie** :
+```python
+{
+    "status": "normal",
+    "last_update": "2025-07-20T14:23:45",
+    "errors": []
+}
+```
+
+---
+
+## Exemple d’utilisation complet
+
+```python
+api = EnvoyAPI(username, password, envoy_host, serial_number)
+await api.authenticate()
+data = await api.get_all_envoy_data()
+print("Production totale :", data["prod_eim_whLifetime"])
+meters = await api.get_meters_info()
+print("Compteurs :", meters)
+status = await api.get_status()
+print("Statut Envoy :", status["status"])
+```
+
+---
+
+# Fonctionnement de la gestion des sensors journaliers dans envoy2mqtt
+
+Le script [envoy2mqtt.py](http://_vscodecontentref_/0) publie les données Envoy sur MQTT et gère le calcul des valeurs journalières pour chaque capteur.
+
+## Principes
+
+- À chaque démarrage, les références "minuit" sont récupérées via MQTT (messages retained).
+- Si une référence est absente, elle est initialisée avec la valeur actuelle.
+- Chaque minute, les valeurs actuelles sont lues et la différence avec la référence minuit est calculée pour obtenir la valeur journalière.
+- À minuit, les références sont mises à jour et la valeur de la veille est sauvegardée.
+
+## Méthodes clés
+
+- `_initialize_missing_references(data)` : Initialise les références minuit manquantes.
+- `_check_and_update_midnight_references(data)` : Met à jour les références à minuit et sauvegarde les valeurs de la veille.
+- `_calculate_daily_values(data)` : Calcule les valeurs journalières pour chaque capteur.
+
+## Topics MQTT utilisés
+
+- `{base_topic}/{serial}/data/{sensor}_00h` : Référence minuit (retained)
+- `{base_topic}/{serial}/data/{sensor}_today` : Valeur journalière
+- `{base_topic}/{serial}/data/{sensor}_yesterday` : Valeur de la veille
+
+---
+
+# Endpoints API appelés sur la passerelle Envoy
+
+Voici les principaux endpoints utilisés pour récupérer les données :
+
+- `/api/v1/production`  
+  → Données de production instantanée et cumulée.
+
+- `/api/v1/consumption`  
+  → Données de consommation instantanée et cumulée.
+
+- `/api/v1/meters`  
+  → Informations sur les compteurs connectés (EID, type, etc.).
+
+- `/auth/check_jwt`  
+  → Vérification du token JWT pour l’accès local.
+
+- `/api/v1/status`  
+  → Statut général de la passerelle (connectivité, erreurs).
+
+**Remarque :** Certains endpoints nécessitent un token JWT obtenu via l’API Enlighten.
+
+---
+
+N’hésite pas à demander si tu veux un format ou des détails supplémentaires
