@@ -424,6 +424,8 @@ class EnvoyAPI:
             processed_data["grid_eim_wNow"] = abs(net_demand) if net_demand < 0 else 0
             processed_data["eco_eim_wNow"] = (prod_demand + net_demand) if net_demand < 0 else prod_demand
 
+            processed_data["eco_eim_whLifetime"] = round(processed_data.get("prod_eim_whLifetime", 0) - processed_data.get("grid_eim_whLifetime", 0), 3)
+
             # Données de consommation
             total_consumption = consumption_data.get("total-consumption", {})
             net_consumption_reports = consumption_data.get("net-consumption", {})
@@ -465,12 +467,18 @@ class EnvoyAPI:
         """Traiter les données de consommation nette des compteurs."""
         rename_mapping = {
             "instantaneousDemand": "conso_net_eim_wNow",
+            "actEnergyRcvd": "grid_eim_whLifetime",
+            "actEnergyDlvd": "import_eim_whLifetime",
         }
 
         processed = {}
         for key, value in meters_data.items():
             if isinstance(value, (int, float)) and key in rename_mapping:
                 processed[rename_mapping[key]] = value
+                if key == "actEnergyRcvd":
+                    processed["grid_eim_kwhLifetime"] = round(value / 1000, 3)
+                elif key == "actEnergyDlvd":
+                    processed["import_eim_kwhLifetime"] = round(value / 1000, 3)
 
         return processed
 
