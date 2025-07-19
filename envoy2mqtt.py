@@ -52,7 +52,8 @@ class EnvoyMQTTService:
         
         # Configuration des intervalles
         self.raw_data_interval = getattr(config, 'RAW_DATA_INTERVAL_SECONDS', 1)
-        
+        self.refresh_interval = getattr(config, 'REFRESH_INTERVAL_MINUTES', 30)
+
         # Construction des topics MQTT
         self.topic_raw = f"{self.base_topic}/{self.serial}/raw"
         self.topic_data = f"{self.base_topic}/{self.serial}/data"
@@ -286,10 +287,11 @@ class EnvoyMQTTService:
                 _LOGGER.info("✅ Données complètes publiées (%d champs + %d journaliers)", len(full_data), len(daily_values))
                 # Calculer le temps d'attente pour maintenir 1 minute
                 elapsed = time.time() - start_time
-                sleep_time = max(0, 60.0 - elapsed)
-                if elapsed > 30.0:
-                    _LOGGER.warning("⏰ Récupération données complètes lente: %.2fs", elapsed)
+                sleep_time = max(0, self.refresh_interval - elapsed)
                 await asyncio.sleep(sleep_time)
+            except asyncio.CancelledError:
+                _LOGGER.info("Tâche publication annulée")
+                break
             except Exception as err:
                 _LOGGER.error("❌ Erreur publication données complètes: %s", err)
                 await asyncio.sleep(60)
@@ -305,15 +307,24 @@ class EnvoyMQTTService:
             _LOGGER.info("📡 Statut publié: %s", status)
 
     async def stop(self):
-        """Arrêter proprement le service MQTT."""
+        """Arrêt propre du service MQTT."""
         self._running = False
+        # Annuler toutes les tâches asynchrones si tu les stockes dans une liste
+        # for task in self._tasks:
+        #     task.cancel()
+        #     try:
+        #         await task
+        #     except asyncio.CancelledError:
+        #         pass
+
+        # Publier le statut offline tant que le client est connecté
         if self._mqtt_client:
             try:
-                await asyncio.wait_for(self._publish_status("offline"), timeout=2)
+                await self._publish_status("offline")
             except Exception as err:
                 _LOGGER.warning("Impossible de publier le statut offline : %s", err)
         _LOGGER.info("🛑 Service arrêté proprement")
-
+        sys.exit(0)
 
 async def main():
     """Fonction principale."""
