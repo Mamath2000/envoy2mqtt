@@ -5,8 +5,8 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
+User=root
+Group=root
 WorkingDirectory=/home/mamath/envoy
 Environment=PATH=/home/mamath/envoy/venv/bin
 ExecStart=/home/mamath/envoy/venv/bin/python /home/mamath/envoy/envoy2mqtt.py
