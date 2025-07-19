@@ -72,8 +72,6 @@ class EnvoyMQTTService:
         # Dernière vérification de minuit
         self._last_midnight_check = None
 
-        self._retained_received = asyncio.Event()
-
     async def _midnight_reference_listener(self):
         """Écoute les messages retained sur les topics de référence minuit et met à jour les valeurs."""
         for sensor in self.daily_sensors:
@@ -93,10 +91,6 @@ class EnvoyMQTTService:
                         _LOGGER.info(f"🔄 Référence {sensor} mise à jour: {payload} Wh")
                     except Exception as e:
                         _LOGGER.error(f"❌ Erreur conversion référence {sensor}: {e}")
-            # Optionnel : lever l'événement si tous les sensors sont reçus
-            if all(self.midnight_references.get(s) is not None for s in self.daily_sensors):
-                self._retained_received.set()
-                break
 
     async def start(self):
         """Démarrer le service MQTT."""
@@ -132,12 +126,10 @@ class EnvoyMQTTService:
                 async with aiomqtt.Client(**mqtt_args) as mqtt_client:
                     self._mqtt_client = mqtt_client
                     _LOGGER.info("✅ Connexion MQTT réussie sur %s:%s", self.mqtt_host, self.mqtt_port)
-                    # Publier un message de statut
                     await self._publish_status("online")
 
-                    # Lancer le listener de référence minuit
                     listener_task = asyncio.create_task(self._midnight_reference_listener())
-                    await self._retained_received.wait()  # Attendre que le listener ait reçu les retained
+                    await asyncio.sleep(10)  # Attendre 10 secondes pour laisser arriver les messages retained
 
                     await self._initialize_missing_references(await self._envoy_api.get_all_envoy_data())
 
@@ -203,26 +195,12 @@ class EnvoyMQTTService:
             if sensor in current_data and self.midnight_references.get(sensor) is not None:
                 current_value = current_data[sensor]
                 midnight_ref = self.midnight_references[sensor]
-                daily_value = current_value - midnight_ref
+                daily_value = round(current_value - midnight_ref, 0)
                 
                 # Créer le nom du capteur journalier
                 daily_sensor_name = sensor.replace('_whLifetime', '_today')
                 daily_values[daily_sensor_name] = max(0, daily_value)  # Éviter les valeurs négatives
                 _LOGGER.info("📊 %s: %.2f Wh (actuel: %.2f, minuit: %.2f)", daily_sensor_name, daily_values[daily_sensor_name], current_value, midnight_ref)
-        
-        # # Calculs des capteurs dérivés (grid_eim_today et eco_eim_today)
-        # conso_all_today = daily_values.get('conso_all_eim_today')
-        # conso_net_today = daily_values.get('conso_net_eim_today')
-        
-        # # eco_eim_today = conso_all_today (autoconsommation)
-        # if conso_all_today is not None:
-        #     daily_values['eco_eim_today'] = max(0, conso_all_today)
-        #     _LOGGER.debug("📊 eco_eim_today: %.2f Wh", daily_values['eco_eim_today'])
-        
-        # # grid_eim_today = conso_net_today (import réseau)
-        # if conso_net_today is not None:
-        #     daily_values['grid_eim_today'] = max(0, conso_net_today)
-        #     _LOGGER.debug("📊 grid_eim_today: %.2f Wh", daily_values['grid_eim_today'])
         
         return daily_values
 
