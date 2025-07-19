@@ -81,9 +81,11 @@ class EnvoyMQTTService:
         topics = [f"{self.topic_data}/{sensor}_00h" for sensor in self.daily_sensors]
         if self.teleinfo_topic:
             topics.append(f"{self.topic_data}/teleinfo_index_00h")
+
         for topic in topics:
             await self._mqtt_client.subscribe(topic)
             _LOGGER.info(f"🟢 Abonné à {topic} pour suivi des références minuit")
+
         async with self._mqtt_client.messages() as messages:
             async for message in messages:
                 topic = message.topic.value
@@ -103,14 +105,6 @@ class EnvoyMQTTService:
                         _LOGGER.info(f"🔄 Référence téléinfo mise à jour: {payload} Wh")
                     except Exception as e:
                         _LOGGER.error(f"❌ Erreur conversion référence téléinfo: {e}")
-
-    async def _load_midnight_references(self):
-        """Initialise les références à None au démarrage (elles seront mises à jour par le listener)."""
-        _LOGGER.info("📖 Initialisation des références minuit à None (elles seront mises à jour par MQTT)")
-        for sensor in self.daily_sensors:
-            self.midnight_references[sensor] = None
-        if self.teleinfo_topic:
-            self.midnight_references['teleinfo_index'] = None
 
     async def start(self):
         """Démarrer le service MQTT."""
@@ -146,12 +140,17 @@ class EnvoyMQTTService:
                 async with aiomqtt.Client(**mqtt_args) as mqtt_client:
                     self._mqtt_client = mqtt_client
                     _LOGGER.info("✅ Connexion MQTT réussie sur %s:%s", self.mqtt_host, self.mqtt_port)
-                    # Initialiser les références à None
-                    await self._load_midnight_references()
-                    # Lancer le listener de référence minuit
-                    listener_task = asyncio.create_task(self._midnight_reference_listener())
                     # Publier un message de statut
                     await self._publish_status("online")
+
+                    # Initialiser les références à None
+                    for sensor in self.daily_sensors:
+                        self.midnight_references[sensor] = None
+                    if self.teleinfo_topic:
+                        self.midnight_references['teleinfo_index'] = None
+                    
+                    # Lancer le listener de référence minuit
+                    listener_task = asyncio.create_task(self._midnight_reference_listener())
                     # Attendre que les messages retained arrivent (tempo)
                     await asyncio.sleep(5)
                     # Démarrer les tâches de publication (en parallèle du listener)
@@ -196,6 +195,15 @@ class EnvoyMQTTService:
             
             if is_near_midnight or self._last_midnight_check is None:
                 _LOGGER.info("🕛 Mise à jour des références minuit...")
+
+                # Sauvegarder les valeurs journalières dans _yesterday
+                daily_values = self._calculate_daily_values(current_data)
+                for sensor, value in daily_values.items():
+                    yesterday_field = sensor.replace('_today', '_yesterday')
+                    self.midnight_references[yesterday_field] = value
+                    topic = f"{self.topic_data}/{yesterday_field}"
+                    await self._mqtt_client.publish(topic, str(value), retain=True)
+                    _LOGGER.info("🕛 Valeur d'hier sauvegardée %s: %.2f Wh", yesterday_field, value)
                 
                 for sensor in self.daily_sensors:
                     if sensor in current_data:
