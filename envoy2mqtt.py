@@ -76,12 +76,6 @@ class EnvoyMQTTService:
         # Dernière vérification de minuit
         self._last_midnight_check = None
 
-        if self._mqtt_client:
-            try:
-                await self._publish_status("offline")
-            except:
-                pass
-    
     async def _midnight_reference_listener(self):
         """Coroutine qui reste abonnée aux topics de référence et met à jour les valeurs à chaque message."""
         topics = [f"{self.topic_data}/{sensor}_00h" for sensor in self.daily_sensors]
@@ -130,20 +124,24 @@ class EnvoyMQTTService:
                 serial_number=self.serial,
                 session=session
             )
+
             try:
                 await self._envoy_api.authenticate()
                 _LOGGER.info("✅ Authentification Envoy réussie")
             except Exception as err:
                 _LOGGER.error("❌ Échec authentification Envoy: %s", err)
                 return
+
             mqtt_args = {
                 "hostname": self.mqtt_host,
                 "port": self.mqtt_port,
             }
+
             if self.mqtt_username:
                 mqtt_args["username"] = self.mqtt_username
             if self.mqtt_password:
                 mqtt_args["password"] = self.mqtt_password
+
             try:
                 async with aiomqtt.Client(**mqtt_args) as mqtt_client:
                     self._mqtt_client = mqtt_client
@@ -160,16 +158,9 @@ class EnvoyMQTTService:
                     await self._run_publishing_tasks()
                     # Annuler le listener à l'arrêt
                     listener_task.cancel()
+
             except Exception as err:
                 _LOGGER.error("❌ Erreur MQTT: %s", err)
-                            _LOGGER.debug("📊 Téléinfo mis à jour: %.0f → %.0f Wh", old_value or 0, new_value)
-                    else:
-                        _LOGGER.debug("⚠️ EAST.value non trouvé lors du rafraîchissement")
-                except (json.JSONDecodeError, ValueError, KeyError) as e:
-                    _LOGGER.debug("❌ Erreur parsing téléinfo lors du rafraîchissement: %s", e)
-                
-        except Exception as err:
-            _LOGGER.debug("Erreur rafraîchissement téléinfo: %s", err)
 
     async def _initialize_missing_references(self, current_data: Dict[str, Any]):
         """Initialiser les références manquantes avec les valeurs actuelles."""
@@ -379,6 +370,15 @@ class EnvoyMQTTService:
             
             _LOGGER.info("📡 Statut publié: %s", status)
 
+    async def stop(self):
+        """Arrêter proprement le service MQTT."""
+        self._running = False
+        if self._mqtt_client:
+            try:
+                await self._publish_status("offline")
+            except Exception as err:
+                _LOGGER.warning("Impossible de publier le statut offline : %s", err)
+        _LOGGER.info("🛑 Service arrêté proprement")
 
 
 async def main():
@@ -389,7 +389,8 @@ async def main():
     # Gestionnaire de signaux pour arrêt propre
     def signal_handler(signum, frame):
         _LOGGER.info("Signal %s reçu, arrêt du service...", signum)
-        asyncio.create_task(service.stop())
+        loop = asyncio.get_event_loop()
+        loop.call_soon_threadsafe(asyncio.create_task, service.stop())
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
