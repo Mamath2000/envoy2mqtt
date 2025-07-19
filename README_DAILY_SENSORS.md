@@ -112,22 +112,3 @@ sensor:
 ## 🔧 Configuration
 
 Configuration dans `config.py` :
-
-```python
-# Configuration Téléinfo pour calculs journaliers
-TELEINFO_TOPIC = "teleinfo/022061153159"  # Topic MQTT téléinfo pour récupérer l'index
-```
-
-La fonctionnalité téléinfo est **optionnelle**. Si `TELEINFO_TOPIC` n'est pas configuré ou si aucune donnée téléinfo n'est disponible, seuls les capteurs de base (`_today`) seront créés, sans `eco_eim_today` et `grid_eim_today`.
-
-### Format téléinfo attendu (TIC mode standard):
-```json
-{
-  "ADSC": {"value": "022061153159", "unit": ""},
-  "EAST": {"value": "123456789", "unit": "Wh"},
-  "IRMS1": {"value": "001", "unit": "A"},
-  ...
-}
-```
-
-L'index est extrait depuis `data['EAST']['value']`.
