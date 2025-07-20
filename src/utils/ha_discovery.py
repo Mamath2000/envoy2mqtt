@@ -26,6 +26,7 @@ async def publish_ha_autodiscovery_dynamic(mqtt_client, device, topic_data, fiel
             continue  # Catégorie non définie
         config_topic = f"homeassistant/{sensor_def.get('platform', 'sensor')}/envoy_{device['identifiers'][0]}/{field}/config"
         _LOGGER.debug(f"Topic de configuration: {config_topic}")
+
         payload = {
             "name": sensor_def.get("name"),
             "state_topic": f"{topic_data}/{field}",
@@ -37,12 +38,17 @@ async def publish_ha_autodiscovery_dynamic(mqtt_client, device, topic_data, fiel
             "value_template": sensor_def.get("value_template", "{{ value | float(default=0) | round(0) }}"),
             "unique_id": f"envoy_{device['identifiers'][0]}_{field}",
             "object_id": f"envoy_{sensor_def.get('name').replace(' ', '_').replace('(', '').replace(')', '').lower()}",
+            "force_update": True,
+            "has_entity_name": True,
+            "payload_on": sensor_def.get("payload_on"),
+            "payload_off": sensor_def.get("payload_off"),
             "device": device
         }
         
         # Nettoyage des clés None
         payload = {k: v for k, v in payload.items() if v is not None}
         # _LOGGER.debug(f"Payload généré pour {field}: {payload}")
+        # Publication de la configuration dans Home Assistant
 
         await mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
         _LOGGER.info(f"📢 HA autodiscovery publié pour {field} ({sensor_def.get('platform', 'sensor')})")

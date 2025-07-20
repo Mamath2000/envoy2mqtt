@@ -313,7 +313,7 @@ class EnvoyAPI:
         except asyncio.TimeoutError:
             raise aiohttp.ClientError(f"Timeout sur {endpoint}")
 
-    async def get_meters_info(self) -> Dict[str, Any]:
+    async def get_meters_info(self) -> Dict[int, Any]:
         """Récupérer les informations des compteurs avec cache."""
         if self._eid_mapping_cache is not None:
             return self._eid_mapping_cache
@@ -422,6 +422,7 @@ class EnvoyAPI:
             prod_demand = production_meter.get("instantaneousDemand", 0)
 
             processed_data["grid_eim_wNow"] = abs(net_demand) if net_demand < 0 else 0
+            processed_data["grid_eim_wNow_binary"]= 1 if net_demand > 0 else 0
             processed_data["eco_eim_wNow"] = (prod_demand + net_demand) if net_demand < 0 else prod_demand
 
             processed_data["eco_eim_whLifetime"] = round(processed_data.get("prod_eim_whLifetime", 0) - processed_data.get("grid_eim_whLifetime", 0), 3)
@@ -464,6 +465,9 @@ class EnvoyAPI:
                 if key == "actEnergyDlvd":
                     processed["prod_eim_kwhLifetime"] = round(value / 1000, 3)
                     
+                elif key == "instantaneousDemand":
+                    processed["prod_eim_wNow_binary"] = 1 if value > 5 else 0
+
         return processed
 
     def _process_meters_net_consumption_data(self, meters_data: Dict[str, Any]) -> Dict[str, Any]:

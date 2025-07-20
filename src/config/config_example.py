@@ -29,8 +29,13 @@ LOG_LEVEL = "INFO"             # DEBUG, INFO, WARNING, ERROR
 
 # Active/désactive la publication des sensors PV production sur le topic dédié
 PV_PROD_SENSOR = False  # True pour activer, False pour désactiver
-
 PV_PROD_TOPIC = "envoy/pv_production_energy"  # Topic MQTT pour la publication PV production sensors
+PV_PROD_SENSOR_NAME = "PV Production Energy"  # Nom du capteur PV production pour Home Assistant
+
+# Active/désactive la publication des sensors de consommation nette
+CONSO_NET_SENSOR = False  # True pour activer, False pour désactiver
+CONSO_NET_TOPIC = "envoy/conso_net_energy"  # Topic MQTT pour la publication de la consommation nette
+CONSO_NET_SENSOR_NAME = "Conso Nette Energy"  # Nom du capteur de consommation nette pour Home Assistant
 
 # Exemples d'URLs Envoy typiques:
 # LOCAL_ENVOY_URL = "https://192.168.1.100"   # IP fixe

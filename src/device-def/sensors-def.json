@@ -2,7 +2,6 @@
     "prod_eim_wNow": {
         "platform": "sensor",
         "name": "Current Power Production",
-        "state_topic": "envoy/122226051519/data/prod_eim_wNow",
         "unit_of_measurement": "W",
         "icon": "mdi:flash",
         "device_class": "power",
@@ -11,7 +10,6 @@
     "prod_eim_whLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Production",
-        "state_topic": "envoy/122226051519/data/prod_eim_whLifetime",
         "unit_of_measurement": "Wh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -20,7 +18,6 @@
     "prod_eim_kwhLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Production (kWh)",
-        "state_topic": "envoy/122226051519/data/prod_eim_kwhLifetime",
         "unit_of_measurement": "kWh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -29,7 +26,6 @@
     "conso_all_eim_wNow": {
         "platform": "sensor",
         "name": "Current Power Consumption",
-        "state_topic": "envoy/122226051519/data/conso_all_eim_wNow",
         "unit_of_measurement": "W",
         "icon": "mdi:flash",
         "device_class": "power",
@@ -38,7 +34,6 @@
     "conso_all_eim_whLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Consumption",
-        "state_topic": "envoy/122226051519/data/conso_all_eim_whLifetime",
         "unit_of_measurement": "Wh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -47,7 +42,6 @@
     "conso_all_eim_kwhLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Consumption (kWh)",
-        "state_topic": "envoy/122226051519/data/conso_all_eim_kwhLifetime",
         "unit_of_measurement": "kWh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -56,7 +50,6 @@
     "conso_all_eim_rmsCurrent": {
         "platform": "sensor",
         "name": "Current Consumption",
-        "state_topic": "envoy/122226051519/data/conso_all_eim_rmsCurrent",
         "unit_of_measurement": "A",
         "icon": "mdi:flash",
         "device_class": "current",
@@ -65,7 +58,6 @@
     "conso_all_eim_rmsVoltage": {
         "platform": "sensor",
         "name": "Voltage Consumption",
-        "state_topic": "envoy/122226051519/data/conso_all_eim_rmsVoltage",
         "unit_of_measurement": "V",
         "icon": "mdi:flash",
         "device_class": "voltage",
@@ -74,7 +66,6 @@
     "conso_net_eim_wNow": {
         "platform": "sensor",
         "name": "Current Energy Net Consumption",
-        "state_topic": "envoy/122226051519/data/conso_net_eim_wNow",
         "unit_of_measurement": "W",
         "icon": "mdi:flash",
         "device_class": "power",
@@ -83,7 +74,6 @@
     "conso_net_eim_whLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Net Consumption",
-        "state_topic": "envoy/122226051519/data/conso_net_eim_whLifetime",
         "unit_of_measurement": "Wh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -92,7 +82,6 @@
     "conso_net_eim_kwhLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Net Consumption (kWh)",
-        "state_topic": "envoy/122226051519/data/conso_net_eim_kwhLifetime",
         "unit_of_measurement": "kWh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -101,7 +90,6 @@
     "grid_eim_wNow": {
         "platform": "sensor",
         "name": "Current Power to Grid",
-        "state_topic": "envoy/122226051519/data/grid_eim_wNow",
         "unit_of_measurement": "W",
         "icon": "mdi:flash",
         "device_class": "power",
@@ -110,7 +98,6 @@
     "eco_eim_wNow": {
         "platform": "sensor",
         "name": "Current Power Economy",
-        "state_topic": "envoy/122226051519/data/eco_eim_wNow",
         "unit_of_measurement": "W",
         "icon": "mdi:flash",
         "device_class": "power",
@@ -119,7 +106,6 @@
     "prod_eim_today": {
         "platform": "sensor",
         "name": "Today's Energy Production",
-        "state_topic": "envoy/122226051519/data/prod_eim_today",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "device_class": "energy",
@@ -128,7 +114,6 @@
     "grid_eim_whLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy to Grid",
-        "state_topic": "envoy/122226051519/data/grid_eim_whLifetime",
         "unit_of_measurement": "Wh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -137,7 +122,6 @@
     "grid_eim_kwhLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy to Grid (kWh)",
-        "state_topic": "envoy/122226051519/data/grid_eim_kwhLifetime",
         "unit_of_measurement": "kWh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -146,7 +130,6 @@
     "eco_eim_whLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Economy",
-        "state_topic": "envoy/122226051519/data/eco_eim_whLifetime",
         "unit_of_measurement": "Wh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -155,7 +138,6 @@
     "eco_eim_kwhLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Economy (kWh)",
-        "state_topic": "envoy/122226051519/data/eco_eim_kwhLifetime",
         "unit_of_measurement": "kWh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -164,7 +146,6 @@
     "import_eim_whLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Import Rx",
-        "state_topic": "envoy/122226051519/data/import_eim_whLifetime",
         "unit_of_measurement": "Wh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -173,7 +154,6 @@
     "import_eim_kwhLifetime": {
         "platform": "sensor",
         "name": "Lifetime Energy Import Rx (kWh)",
-        "state_topic": "envoy/122226051519/data/import_eim_kwhLifetime",
         "unit_of_measurement": "kWh",
         "icon": "mdi:flash",
         "device_class": "energy",
@@ -183,7 +163,6 @@
     "conso_all_eim_today": {
         "platform": "sensor",
         "name": "Today's Energy Consumption",
-        "state_topic": "envoy/122226051519/data/conso_all_eim_today",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "device_class": "energy",
@@ -192,7 +171,6 @@
     "conso_net_eim_today": {
         "platform": "sensor",
         "name": "Today's Energy Net Consumption",
-        "state_topic": "envoy/122226051519/data/conso_net_eim_today",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "device_class": "energy",
@@ -201,7 +179,6 @@
     "eco_eim_today": {
         "platform": "sensor",
         "name": "Today's Energy Economy",
-        "state_topic": "envoy/122226051519/data/eco_eim_today",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "device_class": "energy",
@@ -210,7 +187,6 @@
     "grid_eim_today": {
         "platform": "sensor",
         "name": "Today's Energy To grid",
-        "state_topic": "envoy/122226051519/data/grid_eim_today",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "device_class": "energy",
@@ -219,7 +195,6 @@
     "conso_all_eim_yesterday": {
         "platform": "sensor",
         "name": "Yesterday Energy Consumption",
-        "state_topic": "envoy/122226051519/data/conso_all_eim_yesterday",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "expire_after": 86405,
@@ -229,7 +204,6 @@
     "conso_net_eim_yesterday": {
         "platform": "sensor",
         "name": "Yesterday Energy Net Consumption",
-        "state_topic": "envoy/122226051519/data/conso_net_eim_yesterday",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "expire_after": 86405,
@@ -239,7 +213,6 @@
     "eco_eim_yesterday": {
         "platform": "sensor",
         "name": "Yesterday Energy Economy",
-        "state_topic": "envoy/122226051519/data/eco_eim_yesterday",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "expire_after": 86405,
@@ -249,7 +222,6 @@
     "grid_eim_yesterday": {
         "platform": "sensor",
         "name": "Yesterday Energy To grid",
-        "state_topic": "envoy/122226051519/data/grid_eim_yesterday",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "expire_after": 86405,
@@ -259,7 +231,6 @@
     "prod_eim_yesterday": {
         "platform": "sensor",
         "name": "Yesterday Energy Production",
-        "state_topic": "envoy/122226051519/data/prod_eim_yesterday",
         "unit_of_measurement": "Wh",
         "icon": "mdi:counter",
         "expire_after": 86405,
@@ -269,7 +240,6 @@
     "timestamp": {
         "platform": "sensor",
         "name": "Last Update Timestamp",
-        "state_topic": "envoy/122226051519/data/timestamp",
         "icon": "mdi:counter",
         "device_class": "timestamp",
         "value_template": "{{ as_datetime(value) }}"
@@ -277,8 +247,23 @@
     "timestamp_text": {
         "platform": "sensor",
         "name": "Last Update Timestamp (Text)",
-        "state_topic": "envoy/122226051519/data/timestamp_text",
         "icon": "mdi:counter",
         "value_template": "{{ value }}"
+    },
+    "prod_eim_wNow_binary": {
+        "platform": "binary_sensor",
+        "name": "Current Power Production flag",
+        "value_template": "{{ value }}", 
+        "icon": "mdi:flash",
+        "payload_on": 1,
+        "payload_off": 0
+    },
+    "grid_eim_wNow_binary": {
+        "platform": "binary_sensor",
+        "name": "Current Power to Grid flag",
+        "value_template": "{{ value }}", 
+        "icon": "mdi:flash",
+        "payload_on": 1,
+        "payload_off": 0
     }
 }

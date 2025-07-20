@@ -24,7 +24,7 @@ import src.config.config as config
 import os
 
 from src.utils.ha_discovery import publish_ha_autodiscovery_dynamic
-from src.utils.energy_sensors import publish_pv_production_sensors
+from src.utils.energy_sensors import publish_pv_production_sensors, publish_energy_sensor_discovery,publish_consumption_sensors
 
 # Désactiver les warnings SSL pour les certificats auto-signés de l'Envoy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -60,7 +60,12 @@ class EnvoyMQTTService:
 
         # Flag pour activer/désactiver la publication PV production sensors
         self.pv_prod_sensor_enabled = getattr(config, 'PV_PROD_SENSOR', False)
-        self.pv_prod_sensor_topic = getattr(config, 'PV_PROD_TOPIC', f"{self.base_topic}/pv_production2_energy")
+        self.pv_prod_sensor_topic = getattr(config, 'PV_PROD_TOPIC', f"{self.base_topic}/pv_production_energy")
+        self.pv_prod_sensor_name = getattr(config, 'PV_PROD_SENSOR_NAME', "PV Production Energy")
+
+        self.conso_net_sensor_enabled = getattr(config, 'CONSO_NET_SENSOR', False)
+        self.conso_net_sensor_topic = getattr(config, 'CONSO_NET_TOPIC', f"{self.base_topic}/conso_net_energy")
+        self.conso_net_sensor_name = getattr(config, 'CONSO_NET_SENSOR_NAME', "Conso Nette Energy")
 
         # Construction des topics MQTT
         self.topic_raw = f"{self.base_topic}/{self.serial}/raw"
@@ -90,14 +95,14 @@ class EnvoyMQTTService:
             "name": "Envoy"
         }
 
-        # Charger les noms des capteurs Home Assistant depuis ha-sensors-name.json
-        ha_sensors_file = os.path.join(os.path.dirname(__file__), "../ha_device/ha-sensors-name.json")
+        # Charger les noms des capteurs Home Assistant depuis device-def/sensors-def.json
+        ha_sensors_file = os.path.join(os.path.dirname(__file__), "device-def/sensors-def.json")
         try:
             with open(ha_sensors_file, "r", encoding="utf-8") as f:
                 self.ha_sensors_name = json.load(f)
-                _LOGGER.info("✅ Noms des capteurs Home Assistant chargés depuis ha-sensors-name.json")
+                _LOGGER.info("✅ Noms des capteurs Home Assistant chargés depuis device-def/sensors-def.json")
         except Exception as e:
-            _LOGGER.warning(f"Impossible de charger ha-senssors-name.json: {e}")
+            _LOGGER.warning(f"Impossible de charger device-def/sensors-def.json: {e}")
             self.ha_sensors_name = {}
 
     async def _midnight_reference_listener(self):
@@ -168,7 +173,9 @@ class EnvoyMQTTService:
                     # Ajout de logs pour HA_AUTODISCOVERY
                     if getattr(config, "HA_AUTODISCOVERY", False):
                         _LOGGER.info("🔄 HA_AUTODISCOVERY activé, publication autodiscovery Home Assistant...")
-                        all_fields = list(current_data.keys()) + list(self._calculate_daily_values(current_data).keys())
+                        daily_values = self._calculate_daily_values(current_data).keys()
+                        yesterday_keys = [sensor.replace('_today', '_yesterday') for sensor in daily_values]
+                        all_fields = list(current_data.keys()) + list(daily_values) + yesterday_keys
                         await publish_ha_autodiscovery_dynamic(
                             self._mqtt_client,
                             self.ha_device,
@@ -176,6 +183,25 @@ class EnvoyMQTTService:
                             all_fields,
                             self.ha_sensors_name
                         )
+
+                        if self.pv_prod_sensor_enabled:
+                            _LOGGER.info("🔄 Publication capteurs PV production...")
+                            await publish_energy_sensor_discovery(
+                                    self._mqtt_client, 
+                                    self.pv_prod_sensor_topic, 
+                                    self.pv_prod_sensor_name, 
+                                    "energy"
+                                )
+
+                        if self.conso_net_sensor_enabled:
+                            _LOGGER.info("🔄 Publication capteurs de consommation nette...")
+                            await publish_energy_sensor_discovery(
+                                    self._mqtt_client, 
+                                    self.conso_net_sensor_topic, 
+                                    self.conso_net_sensor_name, 
+                                    "energy"
+                                )
+
                         _LOGGER.info("✅ Publication autodiscovery Home Assistant terminée")
 
                     await self._run_publishing_tasks()
@@ -208,20 +234,6 @@ class EnvoyMQTTService:
         # Mise à jour UNIQUEMENT si on est passé minuit depuis la dernière vérification
         if is_near_midnight and (self._last_midnight_check is None or self._last_midnight_check < current_date):
 
-            # Ajout de logs pour HA_AUTODISCOVERY
-            if getattr(config, "HA_AUTODISCOVERY", False):
-                _LOGGER.info("🔄 HA_AUTODISCOVERY activé, publication autodiscovery Home Assistant...")
-                all_fields = list(current_data.keys()) + list(self._calculate_daily_values(current_data).keys())
-                await publish_ha_autodiscovery_dynamic(
-                    self._mqtt_client,
-                    self.ha_device,
-                    self.topic_data,
-                    all_fields,
-                    self.ha_sensors_name
-                )
-                _LOGGER.info("✅ Publication autodiscovery Home Assistant terminée")
-
-
             _LOGGER.info("🕛 Mise à jour des références minuit...")
             # Sauvegarder les valeurs journalières dans _yesterday
             daily_values = self._calculate_daily_values(current_data)
@@ -229,7 +241,7 @@ class EnvoyMQTTService:
                 yesterday_field = sensor.replace('_today', '_yesterday')
                 self.midnight_references[yesterday_field] = value
                 topic = f"{self.topic_data}/{yesterday_field}"
-                await self._mqtt_client.publish(topic, str(value), retain=True)
+                await self._mqtt_client.publish(topic, value, retain=True)
                 _LOGGER.info("🕛 Valeur d'hier sauvegardée %s: %.2f Wh", yesterday_field, value)
             
             for sensor in self.daily_sensors:
@@ -239,11 +251,44 @@ class EnvoyMQTTService:
                     
                     # Publier la nouvelle référence (retained)
                     topic = f"{self.topic_data}/{sensor}_00h"
-                    await self._mqtt_client.publish(topic, str(value), retain=True)
-                    
+                    await self._mqtt_client.publish(topic, value, retain=True)
+
                     _LOGGER.info("✅ Nouvelle référence %s: %.2f Wh", sensor, value)
             
             self._last_midnight_check = current_date
+
+            # Ajout de logs pour HA_AUTODISCOVERY
+            if getattr(config, "HA_AUTODISCOVERY", False):
+                _LOGGER.info("🔄 HA_AUTODISCOVERY activé, publication autodiscovery Home Assistant...")
+                yesterday_keys = [sensor.replace('_today', '_yesterday') for sensor in daily_values.keys()]
+                all_fields = list(current_data.keys()) + list(daily_values.keys()) + yesterday_keys
+                _LOGGER.debug("Champs pour autodiscovery: %s", all_fields)
+                await publish_ha_autodiscovery_dynamic(
+                    self._mqtt_client,
+                    self.ha_device,
+                    self.topic_data,
+                    all_fields,
+                    self.ha_sensors_name
+                )
+                _LOGGER.info("✅ Publication autodiscovery Home Assistant terminée")
+
+                if self.pv_prod_sensor_enabled:
+                    _LOGGER.info("🔄 Publication capteurs PV production...")
+                    await publish_energy_sensor_discovery(
+                            self._mqtt_client, 
+                            self.pv_prod_sensor_topic, 
+                            self.pv_prod_sensor_name, 
+                            "energy"
+                        )
+
+                if self.conso_net_sensor_enabled:
+                    _LOGGER.info("🔄 Publication capteurs de consommation nette...")
+                    await publish_energy_sensor_discovery(
+                            self._mqtt_client, 
+                            self.conso_net_sensor_topic, 
+                            self.conso_net_sensor_name, 
+                            "energy"
+                        )
 
     def _calculate_daily_values(self, current_data: Dict[str, Any]) -> Dict[str, float]:
         """Calculer les valeurs journalières depuis minuit."""
@@ -342,6 +387,9 @@ class EnvoyMQTTService:
                 # Publication PV production sensors si activé
                 if self.pv_prod_sensor_enabled:
                     await publish_pv_production_sensors(self._mqtt_client, self.pv_prod_sensor_topic, full_data)
+
+                if self.conso_net_sensor_enabled:
+                    await publish_consumption_sensors(self._mqtt_client, self.conso_net_sensor_topic, full_data)
 
                 # Calculer le temps d'attente pour maintenir 1 minute
                 elapsed = time.time() - start_time
