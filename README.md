@@ -2,6 +2,8 @@
 
 ## 🧩 Fonctionnalités principales
 
+> **À savoir :** L’authentification initiale se fait en ligne auprès du service Enlighten d’Enphase (nécessaire pour obtenir le token d’accès). Ensuite, toutes les communications et récupérations de données se font en `local`, `directement avec la passerelle Envoy`, sans passer par le cloud. Cela garantit rapidité, autonomie et confidentialité des échanges.
+
 ```mermaid
 flowchart TD
     A[Passerelle Envoy S Metered]
@@ -28,7 +30,9 @@ flowchart TD
 
     %% Explications
     classDef exp fill,stroke:#333,stroke-width:2px;
+    classDef local fill:#cfc,stroke:#333,stroke-width:2px;
     class B1,B2,B3 exp;
+    class A local;
 ```
 
 Ce programme propose plusieurs fonctionnalités autour de la passerelle Enphase Envoy S Metered :
@@ -56,13 +60,34 @@ Ce programme propose plusieurs fonctionnalités autour de la passerelle Enphase 
 
 
 
+
 ## ⚡ Commande principale pour lancer envoy2mqtt
+
+
+La commande `make` permet de gérer facilement toutes les étapes du projet : installation, lancement, gestion du service systemd, nettoyage, test, diagnostic, etc. Elle automatise les tâches courantes pour simplifier l’utilisation.
+
+Voici la liste des commandes disponibles :
+
+| Commande              | Description |
+|-----------------------|-------------|
+| `make help`           | Affiche l’aide et la liste des commandes |
+| `make install`        | Installe les dépendances Python dans le venv |
+| `make run`            | Lance envoy2mqtt en mode interactif |
+| `make test`           | Teste l’API Envoy (debug) |
+| `make diagnostic`     | Diagnostic complet avec réponses brutes |
+| `make service-install`| Installe le service systemd envoy2mqtt |
+| `make service-start`  | Démarre le service systemd |
+| `make service-stop`   | Arrête le service systemd |
+| `make service-status` | Affiche le statut du service systemd |
+| `make service-logs`   | Affiche les logs du service en temps réel |
+| `make service-remove` | Désinstalle le service systemd |
+| `make clean`          | Nettoie les fichiers temporaires et les __pycache__ |
+
+Pour lancer le service en mode interactif (Ctrl+C pour arrêter) :
 
 ```bash
 make run
 ```
-
-Cette commande lance le service en mode interactif (Ctrl+C pour arrêter).
 
 ## 🚀 Installation rapide
 
