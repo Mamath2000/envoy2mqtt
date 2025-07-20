@@ -1,3 +1,6 @@
-# Point d'entrée du programme
+
+import asyncio
+from src.envoy2mqtt import main
+
 if __name__ == "__main__":
-    print("Programme principal lancé.")
+    asyncio.run(main())

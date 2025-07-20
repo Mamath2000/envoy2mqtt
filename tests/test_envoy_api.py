@@ -14,8 +14,8 @@ from pathlib import Path
 
 import aiohttp
 
-from envoy_api import EnvoyAPI
-import config
+from src.envoy_api import EnvoyAPI
+from src.config import config
 
 # Configuration du logging
 logging.basicConfig(

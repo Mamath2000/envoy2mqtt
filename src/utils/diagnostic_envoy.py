@@ -11,8 +11,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-import config
-from envoy_auth import EnvoyAuth
+import src.config.config as config
+from src.utils.envoy_auth import EnvoyAuth
 
 class EnvoyDiagnostic:
     """Diagnostic complet de l'API Envoy."""
@@ -48,11 +48,16 @@ class EnvoyDiagnostic:
     async def authenticate(self):
         """Authentifier avec l'Envoy."""
         print("🔐 Authentification...")
-        auth = EnvoyAuth()
+        auth = EnvoyAuth(
+            username=self.username,
+            password=self.password,
+            serial_number=self.serial_number,
+            local_envoy_url=self.envoy_host
+        )
         success = await asyncio.to_thread(auth.authenticate)
         
         if success:
-            self.auth_token = auth.token
+            self.auth_token = auth.auth_token
             print(f"✅ Authentification réussie")
             return True
         else:

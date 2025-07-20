@@ -28,7 +28,7 @@ install:
 run:
 	@if [ ! -f src/config/config.py ]; then echo "❌ Fichier config.py manquant!"; exit 1; fi
 	@echo "🚀 Lancement d'envoy2mqtt..."
-	@venv/bin/python src/envoy2mqtt.py
+	PYTHONPATH=. venv/bin/python src/main.py
 
 
 service-install:
@@ -63,9 +63,9 @@ clean:
 
 test:
 	@echo "🧪 Test de l'API Envoy..."
-	@venv/bin/python tests/test_envoy_api.py
+	PYTHONPATH=. venv/bin/python tests/test_envoy_api.py
 
 diagnostic:
 	@echo "🔍 Diagnostic complet Envoy (réponses brutes)..."
-	@venv/bin/python src/diagnostic_envoy.py
+	PYTHONPATH=. venv/bin/python src/utils/diagnostic_envoy.py
 
