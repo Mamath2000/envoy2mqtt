@@ -116,134 +116,30 @@ La classe `EnvoyAPI` permet d’interagir avec la passerelle Enphase Envoy S via
 
 ## Méthodes principales
 
-### `async authenticate()`
-**Rôle** : Authentifie l’utilisateur auprès de l’API Enlighten et récupère un token JWT pour les requêtes locales.
+### `authenticate()`
+Authentifie l’utilisateur auprès de l’API Enlighten et récupère un token d’accès pour les requêtes locales.
 
-**Paramètres** : Aucun  
-**Retour** : None (met à jour l’état interne du client)
+### `get_raw_data()`
+Récupère les données brutes (production, consommation, etc.) depuis la passerelle Envoy.
 
-**Exemple d’appel** :
-```python
-await api.authenticate()
-```
+### `get_all_envoy_data()`
+Récupère toutes les données consolidées (production, consommation nette, etc.) depuis la passerelle.
 
----
+### `refresh_token()`
+Rafraîchit le token d’accès si nécessaire (intervalle configurable).
 
-### `async get_raw_data()`
-**Rôle** : Récupère les données brutes de production et de consommation depuis la passerelle.
+### `get_meters_info()`
+Retourne les informations sur les compteurs connectés à la passerelle.
 
-**Paramètres** : Aucun  
-**Retour** : `Dict[str, Any]`
+### `get_status()`
+Retourne le statut actuel de la passerelle (connectivité, état, etc.).
 
-**Exemple d’appel** :
-```python
-raw = await api.get_raw_data()
-print(raw["production"])
-```
-**Exemple de sortie** :
-```python
-{
-    "production": 1234.5,
-    "consumption": 678.9,
-    "timestamp": 1721460000
-}
-```
-
----
-
-### `async get_all_envoy_data()`
-**Rôle** : Récupère toutes les données consolidées : production, consommation nette, énergie injectée, etc.
-
-**Paramètres** : Aucun  
-**Retour** : `Dict[str, Any]`
-
-**Exemple d’appel** :
-```python
-data = await api.get_all_envoy_data()
-print(data["prod_eim_whLifetime"])
-```
-**Exemple de sortie** :
-```python
-{
-    "prod_eim_whLifetime": 9354611.767,
-    "conso_all_eim_whLifetime": 33253406.226,
-    "conso_net_eim_whLifetime": 23899915.788,
-    "grid_eim_whLifetime": 2126308.666,
-    "eco_eim_whLifetime": 7242918.837,
-    "timestamp": 1721460000
-}
-```
-
----
-
-### `async refresh_token()`
-**Rôle** : Rafraîchit le token JWT si nécessaire (selon l’intervalle défini).
-
-**Paramètres** : Aucun  
-**Retour** : None
-
-**Exemple d’appel** :
-```python
-await api.refresh_token()
-```
-
----
-
-### `async get_meters_info()`
-**Rôle** : Retourne les informations sur les compteurs connectés à la passerelle (EID, type, etc.).
-
-**Paramètres** : Aucun  
-**Retour** : `List[Dict[str, Any]]`
-
-**Exemple d’appel** :
-```python
-meters = await api.get_meters_info()
-for meter in meters:
-    print(meter["type"], meter["eid"])
-```
-**Exemple de sortie** :
-```python
-[
-    {"eid": 704643328, "type": "production", "state": "active"},
-    {"eid": 704643584, "type": "net-consumption", "state": "active"}
-]
-```
-
----
-
-### `async get_status()`
-**Rôle** : Retourne le statut actuel de la passerelle (connectivité, état, erreurs éventuelles).
-
-**Paramètres** : Aucun  
-**Retour** : `Dict[str, Any]`
-
-**Exemple d’appel** :
-```python
-status = await api.get_status()
-print(status["status"])
-```
-**Exemple de sortie** :
-```python
-{
-    "status": "normal",
-    "last_update": "2025-07-20T14:23:45",
-    "errors": []
-}
-```
-
----
-
-## Exemple d’utilisation complet
+## Exemple d’utilisation
 
 ```python
 api = EnvoyAPI(username, password, envoy_host, serial_number)
 await api.authenticate()
 data = await api.get_all_envoy_data()
-print("Production totale :", data["prod_eim_whLifetime"])
-meters = await api.get_meters_info()
-print("Compteurs :", meters)
-status = await api.get_status()
-print("Statut Envoy :", status["status"])
 ```
 
 ---
