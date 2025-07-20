@@ -9,6 +9,7 @@ User=root
 Group=root
 WorkingDirectory={WorkingDirectory}
 Environment=PATH={WorkingDirectory}/venv/bin
+Environment=PYTHONPATH={WorkingDirectory}
 ExecStart={WorkingDirectory}/venv/bin/python {WorkingDirectory}/src/main.py
 Restart=always
 RestartSec=10
