@@ -2,6 +2,31 @@
 
 ## 🧩 Fonctionnalités principales
 
+```mermaid
+flowchart TD
+    A[Passerelle Envoy S Metered]
+    subgraph MQTT
+        B1[Publication sensors complets]
+        B2[Publication sensors PRODUCT & CONSO NETTE]
+        B3[Publication haute fréquence (1Hz) de métriques clés]
+    end
+    subgraph Home Assistant
+        C1[Autodiscovery & intégration sensors]
+        C2[Automatisations & pilotage équipements]
+    end
+
+    A --> B1
+    A --> B2
+    A --> B3
+    B1 --> C1
+    B2 --> C1
+    B3 --> C2
+
+    %% Explications
+    classDef exp fill:#f9f,stroke:#333,stroke-width:2px;
+    class B1,B2,B3 exp;
+```
+
 Ce programme propose plusieurs fonctionnalités autour de la passerelle Enphase Envoy S Metered :
 
 ### 1. Récupération et exposition des sensors de la passerelle
