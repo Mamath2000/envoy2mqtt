@@ -24,6 +24,7 @@ import src.config.config as config
 import os
 
 from src.utils.ha_discovery import publish_ha_autodiscovery_dynamic
+from src.utils.energy_sensors import publish_pv_production_sensors
 
 # Désactiver les warnings SSL pour les certificats auto-signés de l'Envoy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -56,6 +57,10 @@ class EnvoyMQTTService:
         # Configuration des intervalles
         self.raw_data_interval = getattr(config, 'RAW_DATA_INTERVAL_SECONDS', 1)
         self.refresh_interval = getattr(config, 'REFRESH_INTERVAL_MINUTES', 30)
+
+        # Flag pour activer/désactiver la publication PV production sensors
+        self.pv_prod_sensor_enabled = getattr(config, 'PV_PROD_SENSOR', False)
+        self.pv_prod_sensor_topic = getattr(config, 'PV_PROD_TOPIC', f"{self.base_topic}/pv_production2_energy")
 
         # Construction des topics MQTT
         self.topic_raw = f"{self.base_topic}/{self.serial}/raw"
@@ -293,14 +298,7 @@ class EnvoyMQTTService:
                 for field, value in raw_data.items():
                     topic = f"{self.topic_raw}/{field}"
                     await self._mqtt_client.publish(topic, json.dumps(value))
-                
-
-                # # Publier également en JSON complet
-                # await self._mqtt_client.publish(
-                #     f"{self.topic_raw}/json", 
-                #     json.dumps(raw_data)
-                # )
-                
+                                
                 # Calculer le temps d'attente pour maintenir l'intervalle configuré
                 elapsed = time.time() - start_time
                 sleep_time = max(0, self.raw_data_interval - elapsed)
@@ -338,9 +336,13 @@ class EnvoyMQTTService:
                 for field, value in daily_values.items():
                     topic = f"{self.topic_data}/{field}"
                     await self._mqtt_client.publish(topic, str(value), retain=True)
-                total_fields = len(full_data) + len(daily_values)
+
                 _LOGGER.info("✅ Données complètes publiées (%d champs + %d journaliers)", len(full_data), len(daily_values))
                 
+                # Publication PV production sensors si activé
+                if self.pv_prod_sensor_enabled:
+                    await publish_pv_production_sensors(self._mqtt_client, self.pv_prod_sensor_topic, full_data)
+
                 # Calculer le temps d'attente pour maintenir 1 minute
                 elapsed = time.time() - start_time
                 sleep_time = max(0, self.refresh_interval - elapsed)

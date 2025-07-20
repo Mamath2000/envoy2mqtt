@@ -27,6 +27,11 @@ REFRESH_INTERVAL_MINUTES = 10  # Intervalle de rafraîchissement du token
 RAW_DATA_INTERVAL_SECONDS = 1  # Intervalle de publication des données brutes (en secondes, 0 = désactivé)
 LOG_LEVEL = "INFO"             # DEBUG, INFO, WARNING, ERROR
 
+# Active/désactive la publication des sensors PV production sur le topic dédié
+PV_PROD_SENSOR = False  # True pour activer, False pour désactiver
+
+PV_PROD_TOPIC = "envoy/pv_production_energy"  # Topic MQTT pour la publication PV production sensors
+
 # Exemples d'URLs Envoy typiques:
 # LOCAL_ENVOY_URL = "https://192.168.1.100"   # IP fixe
 # LOCAL_ENVOY_URL = "https://envoy.local"      # Nom mDNS (si supporté)

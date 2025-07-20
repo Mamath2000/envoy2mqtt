@@ -449,6 +449,9 @@ class EnvoyAPI:
         """Traiter les données de production des compteurs."""
         rename_mapping = {
             "instantaneousDemand": "prod_eim_wNow",
+            "voltage": "prod_eim_voltage",
+            "current": "prod_eim_current",
+            "pwrFactor": "prod_eim_pwrFactor",
             "actEnergyDlvd": "prod_eim_whLifetime",
             "today": "prod_eim_today"
         }
@@ -467,6 +470,9 @@ class EnvoyAPI:
         """Traiter les données de consommation nette des compteurs."""
         rename_mapping = {
             "instantaneousDemand": "conso_net_eim_wNow",
+            "voltage": "conso_net_eim_voltage",
+            "current": "conso_net_eim_current",
+            "pwrFactor": "conso_net_eim_pwrFactor",
             "actEnergyRcvd": "grid_eim_whLifetime",
             "actEnergyDlvd": "import_eim_whLifetime",
         }
