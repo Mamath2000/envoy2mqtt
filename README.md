@@ -8,11 +8,13 @@ flowchart TD
     subgraph MQTT
         B1[Publication sensors complets]
         B2[Publication sensors PRODUCT & CONSO NETTE]
-        B3[Publication haute fréquence (1Hz) de métriques clés]
+        B3[Publication haute fréquence de métriques clés]
     end
     subgraph Home Assistant
         C1[Autodiscovery & intégration sensors]
         C2[Automatisations & pilotage équipements]
+        D1[Routeur solaire]
+        D2[Pilotage Chauffe-eau]
     end
 
     A --> B1
@@ -21,9 +23,11 @@ flowchart TD
     B1 --> C1
     B2 --> C1
     B3 --> C2
+    C2 --> D1
+    C2 --> D2
 
     %% Explications
-    classDef exp fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef exp fill,stroke:#333,stroke-width:2px;
     class B1,B2,B3 exp;
 ```
 
