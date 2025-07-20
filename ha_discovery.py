@@ -13,14 +13,19 @@ def get_sensor_def(field, sensors_def):
 async def publish_ha_autodiscovery_dynamic(mqtt_client, device, topic_data, fields, sensors_def):
 
     """Publie la configuration d'autodécouverte Home Assistant pour les capteurs dynamiques."""
+    _LOGGER.debug("Début de la publication HA autodiscovery dynamique")
     for field in fields:
+        _LOGGER.debug(f"Traitement du champ: {field}")
         if field.endswith('_00h'):
+            _LOGGER.debug(f"Champ ignoré (suffixe '_00h'): {field}")
             continue  # On ignore les références minuit
 
         sensor_def = get_sensor_def(field, sensors_def)
         if not sensor_def:
+            _LOGGER.warning(f"Aucune définition de capteur trouvée pour le champ: {field}")
             continue  # Catégorie non définie
         config_topic = f"homeassistant/{sensor_def.get('platform', 'sensor')}/envoy_{device['identifiers'][0]}/{field}/config"
+        _LOGGER.debug(f"Topic de configuration: {config_topic}")
         payload = {
             "name": sensor_def.get("name"),
             "state_topic": f"{topic_data}/{field}",
@@ -34,8 +39,11 @@ async def publish_ha_autodiscovery_dynamic(mqtt_client, device, topic_data, fiel
             "object_id": f"envoy_{sensor_def.get('name').replace(' ', '_').replace('(', '').replace(')', '').lower()}",
             "device": device
         }
+        
         # Nettoyage des clés None
         payload = {k: v for k, v in payload.items() if v is not None}
-        
+        # _LOGGER.debug(f"Payload généré pour {field}: {payload}")
+
         await mqtt_client.publish(config_topic, json.dumps(payload), retain=True)
-        _LOGGER.info(f"📢 HA autodiscovery publié pour {field} ({payload['platform']})")
+        _LOGGER.info(f"📢 HA autodiscovery publié pour {field} ({sensor_def.get('platform', 'sensor')})")
+    _LOGGER.debug("Fin de la publication HA autodiscovery dynamique")

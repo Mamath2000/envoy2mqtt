@@ -21,6 +21,9 @@ import aiomqtt
 
 from envoy_api import EnvoyAPI
 import config
+import os
+
+from ha_discovery import publish_ha_autodiscovery_dynamic 
 
 # Désactiver les warnings SSL pour les certificats auto-signés de l'Envoy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -72,6 +75,24 @@ class EnvoyMQTTService:
         
         # Dernière vérification de minuit
         self._last_midnight_check = None
+
+        # Device info pour Home Assistant
+        self.ha_device = {
+            "identifiers": [self.serial],
+            "manufacturer": "Enphase",
+            "model": "Envoy S Meter",
+            "name": "Envoy"
+        }
+
+        # Charger les noms des capteurs Home Assistant depuis ha-sensors-name.json
+        ha_sensors_file = os.path.join(os.path.dirname(__file__), "ha_device/ha-sensors-name.json")
+        try:
+            with open(ha_sensors_file, "r", encoding="utf-8") as f:
+                self.ha_sensors_name = json.load(f)
+                _LOGGER.info("✅ Noms des capteurs Home Assistant chargés depuis ha-sensors-name.json")
+        except Exception as e:
+            _LOGGER.warning(f"Impossible de charger ha-senssors-name.json: {e}")
+            self.ha_sensors_name = {}
 
     async def _midnight_reference_listener(self):
         """Écoute les messages retained sur les topics de référence minuit et met à jour les valeurs."""
@@ -130,9 +151,26 @@ class EnvoyMQTTService:
                     await self._publish_status("online")
 
                     listener_task = asyncio.create_task(self._midnight_reference_listener())
+
                     await asyncio.sleep(10)  # Attendre 10 secondes pour laisser arriver les messages retained
 
-                    await self._initialize_missing_references(await self._envoy_api.get_all_envoy_data())
+                    # Charger les références minuit depuis MQTT
+                    _LOGGER.info("🔄 Chargement des références minuit depuis MQTT...")
+                    current_data = await self._envoy_api.get_all_envoy_data()
+                    await self._initialize_missing_references(current_data)
+
+                    # Ajout de logs pour HA_AUTODISCOVERY
+                    if getattr(config, "HA_AUTODISCOVERY", False):
+                        _LOGGER.info("🔄 HA_AUTODISCOVERY activé, publication autodiscovery Home Assistant...")
+                        all_fields = list(current_data.keys()) + list(self._calculate_daily_values(current_data).keys())
+                        await publish_ha_autodiscovery_dynamic(
+                            self._mqtt_client,
+                            self.ha_device,
+                            self.topic_data,
+                            all_fields,
+                            self.ha_sensors_name
+                        )
+                        _LOGGER.info("✅ Publication autodiscovery Home Assistant terminée")
 
                     await self._run_publishing_tasks()
                     listener_task.cancel()
@@ -163,8 +201,22 @@ class EnvoyMQTTService:
 
         # Mise à jour UNIQUEMENT si on est passé minuit depuis la dernière vérification
         if is_near_midnight and (self._last_midnight_check is None or self._last_midnight_check < current_date):
-            _LOGGER.info("🕛 Mise à jour des références minuit...")
 
+            # Ajout de logs pour HA_AUTODISCOVERY
+            if getattr(config, "HA_AUTODISCOVERY", False):
+                _LOGGER.info("🔄 HA_AUTODISCOVERY activé, publication autodiscovery Home Assistant...")
+                all_fields = list(current_data.keys()) + list(self._calculate_daily_values(current_data).keys())
+                await publish_ha_autodiscovery_dynamic(
+                    self._mqtt_client,
+                    self.ha_device,
+                    self.topic_data,
+                    all_fields,
+                    self.ha_sensors_name
+                )
+                _LOGGER.info("✅ Publication autodiscovery Home Assistant terminée")
+
+
+            _LOGGER.info("🕛 Mise à jour des références minuit...")
             # Sauvegarder les valeurs journalières dans _yesterday
             daily_values = self._calculate_daily_values(current_data)
             for sensor, value in daily_values.items():
@@ -285,6 +337,7 @@ class EnvoyMQTTService:
                     await self._mqtt_client.publish(topic, str(value), retain=True)
                 total_fields = len(full_data) + len(daily_values)
                 _LOGGER.info("✅ Données complètes publiées (%d champs + %d journaliers)", len(full_data), len(daily_values))
+                
                 # Calculer le temps d'attente pour maintenir 1 minute
                 elapsed = time.time() - start_time
                 sleep_time = max(0, self.refresh_interval - elapsed)

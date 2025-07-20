@@ -438,8 +438,7 @@ class EnvoyAPI:
             
             # Métadonnées
             processed_data["timestamp"] = int(time.time())
-            processed_data["timestamp_text"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+            processed_data["timestamp_text"] = datetime.now().isoformat(sep='T', timespec='seconds')
             return processed_data
             
         except Exception as err:
