@@ -270,7 +270,9 @@
         "platform": "sensor",
         "name": "Last Update Timestamp",
         "state_topic": "envoy/122226051519/data/timestamp",
-        "icon": "mdi:counter"
+        "icon": "mdi:counter",
+        "device_class": "timestamp",
+        "value_template": "{{ as_datetime(value) }}"
     },
     "timestamp_text": {
         "platform": "sensor",

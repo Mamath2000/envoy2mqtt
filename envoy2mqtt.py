@@ -327,10 +327,12 @@ class EnvoyMQTTService:
                 await self._check_and_update_midnight_references(full_data)
                 # Calculer les valeurs journalières
                 daily_values = self._calculate_daily_values(full_data)
+
                 # Publier chaque champ dans un topic séparé
                 for field, value in full_data.items():
                     topic = f"{self.topic_data}/{field}"
-                    await self._mqtt_client.publish(topic, json.dumps(value), retain=True)
+                    await self._mqtt_client.publish(topic, value, retain=True)
+
                 # Publier les valeurs journalières
                 for field, value in daily_values.items():
                     topic = f"{self.topic_data}/{field}"

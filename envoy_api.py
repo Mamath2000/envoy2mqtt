@@ -437,8 +437,8 @@ class EnvoyAPI:
             processed_data["prod_eim_wattHoursToday"] = production_v1_data.get("wattHoursToday", 0)
             
             # Métadonnées
-            processed_data["timestamp"] = int(time.time())
-            processed_data["timestamp_text"] = datetime.now().isoformat(sep='T', timespec='seconds')
+            processed_data["timestamp"] = int(time.time())  # Timestamp en secondes
+            processed_data["timestamp_text"] = datetime.now().isoformat(sep=' ', timespec='seconds')
             return processed_data
             
         except Exception as err:

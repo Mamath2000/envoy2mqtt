@@ -22,7 +22,7 @@ async def publish_ha_autodiscovery_dynamic(mqtt_client, device, topic_data, fiel
 
         sensor_def = get_sensor_def(field, sensors_def)
         if not sensor_def:
-            _LOGGER.warning(f"Aucune définition de capteur trouvée pour le champ: {field}")
+            _LOGGER.warning(f"⚠️ Aucune définition de capteur trouvée pour le champ: {field}")
             continue  # Catégorie non définie
         config_topic = f"homeassistant/{sensor_def.get('platform', 'sensor')}/envoy_{device['identifiers'][0]}/{field}/config"
         _LOGGER.debug(f"Topic de configuration: {config_topic}")
