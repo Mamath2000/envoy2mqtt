@@ -1,8 +1,31 @@
 # Envoy2MQTT
 
-🌞 **Passerelle Enphase Envoy vers MQTT**
+## 🧩 Fonctionnalités principales
 
-Ce projet permet de publier les données de votre passerelle Enphase Envoy S vers un broker MQTT en temps réel.
+Ce programme propose plusieurs fonctionnalités autour de la passerelle Enphase Envoy S Metered :
+
+### 1. Récupération et exposition des sensors de la passerelle
+
+- Récupère de nombreux capteurs de la passerelle Envoy : index de consommation, index de production, énergie renvoyée au réseau, économie réalisée, etc.
+- Tire parti des deux capteurs ampèremétriques internes de la passerelle Envoy S Metered pour suivre précisément la consommation et la production.
+- Expose tous ces sensors côté Home Assistant via MQTT et autodiscovery, permettant un suivi complet et une intégration domotique avancée.
+
+### 2. Publication dédiée des deux sensors principaux
+
+- Publie deux sensors MQTT correspondant aux deux capteurs ampèremétriques :
+  - **PRODUCT** : suivi de la production photovoltaïque instantanée et cumulée.
+  - **CONSO NETTE** : suivi de la consommation nette (après soustraction de la production locale).
+- Ces sensors sont déclarés automatiquement pour Home Assistant et utilisables dans vos automatisations.
+
+### 3. Publication haute fréquence (1 Hz) de métriques clés
+
+- Publie à haute fréquence (par exemple 1 Hz) les valeurs instantanées :
+  - `conso_all_eim_wNow` : puissance totale consommée
+  - `conso_net_eim_wNow` : puissance nette consommée
+  - `prod_eim_wNow` : puissance instantanée produite
+- Ces publications MQTT permettent de piloter en temps réel des équipements d’optimisation de la consommation, comme un routeur solaire (ex : gestion d’un chauffe-eau).
+
+
 
 ## ⚡ Commande principale pour lancer envoy2mqtt
 
@@ -19,23 +42,84 @@ Cette commande lance le service en mode interactif (Ctrl+C pour arrêter).
 make install
 
 # 2. Configurer vos identifiants
-cp config_example.py config.py
-nano config.py  # Éditez avec vos identifiants Enphase
+cp src/config/config_example.py src/config/config.py
+nano src/config/config.py  # Éditez avec vos identifiants Enphase
 
 # 3. Lancer le service
 make run
 ```
 
+
 ## 📝 Configuration
 
-Éditez le fichier `config.py` avec :
+Éditez le fichier `src/config/config.py` avec les paramètres suivants :
 
-- **USERNAME/PASSWORD** : Vos identifiants Enphase (mêmes que sur enlighten.enphaseenergy.com)
+- **USERNAME / PASSWORD** : Identifiants Enphase Enlighten
 - **SERIAL_NUMBER** : Numéro de série de votre Envoy S (12 chiffres)
 - **LOCAL_ENVOY_URL** : IP locale de votre Envoy (ex: https://192.168.1.100)
-- **MQTT_HOST** : Adresse de votre broker MQTT
-- **MQTT_BASE_TOPIC** : Topic de base MQTT (par défaut "envoy")
-- **RAW_DATA_INTERVAL_SECONDS** : Intervalle de publication des données brutes en secondes (par défaut 1, 0 = désactivé)
+- **MQTT_HOST / MQTT_PORT / MQTT_USERNAME / MQTT_PASSWORD** : Configuration du broker MQTT
+- **MQTT_BASE_TOPIC** : Topic de base MQTT (ex: envoy)
+- **RAW_DATA_INTERVAL_SECONDS** : Intervalle de publication des données brutes (secondes, 0 = désactivé)
+- **REFRESH_INTERVAL_MINUTES** : Intervalle de rafraîchissement du token
+- **LOG_LEVEL** : Niveau de log (DEBUG, INFO, WARNING, ERROR)
+
+### Flags et options avancées
+
+- **HA_AUTODISCOVERY** : Active la publication Home Assistant autodiscovery (True/False)
+- **PV_PROD_SENSOR** : Active la publication du sensor PV production sur le topic dédié (True/False)
+- **PV_PROD_TOPIC** : Topic MQTT pour la publication du sensor PV production (ex: envoy/pv_production_energy)
+- **PV_PROD_SENSOR_NAME** : Nom du capteur PV production pour Home Assistant (ex: "PV Production Energy")
+- **CONSO_NET_SENSOR** : Active la publication du sensor de consommation nette sur le topic dédié (True/False)
+- **CONSO_NET_TOPIC** : Topic MQTT pour la publication du sensor consommation nette (ex: envoy/conso_net_energy)
+- **CONSO_NET_SENSOR_NAME** : Nom du capteur consommation nette pour Home Assistant (ex: "Conso Nette Energy")
+
+### Description des sensors publiés
+
+#### Sensors standards envoyés sur MQTT
+
+- **prod_eim_kwhLifetime** : Énergie totale produite (kWh)
+- **prod_eim_wNow** : Puissance instantanée produite (W)
+- **prod_eim_pwrFactor** : Facteur de puissance production
+- **prod_eim_voltage** : Tension production (V)
+- **prod_eim_current** : Courant production (A)
+- **conso_net_eim_kwhLifetime** : Énergie nette consommée (kWh)
+- **conso_net_eim_wNow** : Puissance nette consommée (W)
+- **conso_net_eim_pwrFactor** : Facteur de puissance consommation nette
+- **conso_net_eim_voltage** : Tension consommation nette (V)
+- **conso_net_eim_current** : Courant consommation nette (A)
+
+#### Sensors Home Assistant autodiscovery
+
+Si activé, chaque sensor est déclaré automatiquement pour Home Assistant avec les attributs :
+- `unique_id`, `object_id`, `device`, `device_class`, `unit_of_measurement`, `state_class`, `state_topic`, `json_attributes_topic`, `value_template`, etc.
+
+Exemple pour le sensor PV production :
+```json
+{
+  "unique_id": "pv_production_energy_energy",
+  "object_id": "pv_production_energy_energy",
+  "device": {
+    "identifiers": ["envoy_122226051519"],
+    "model": "Envoy Meter S",
+    "manufacturer": "Mamath",
+    "name": "PV Production Energy"
+  },
+  "enabled_by_default": true,
+  "device_class": "energy",
+  "unit_of_measurement": "kWh",
+  "state_class": "total_increasing",
+  "state_topic": "envoy/pv_production_energy",
+  "json_attributes_topic": "envoy/pv_production_energy",
+  "value_template": "{{ value_json.energy }}"
+}
+```
+
+#### Sensors journaliers
+
+Pour chaque capteur, les valeurs suivantes sont calculées et publiées :
+- `{sensor}_00h` : Référence minuit (valeur à minuit)
+- `{sensor}_today` : Valeur journalière (depuis minuit)
+- `{sensor}_yesterday` : Valeur de la veille
 
 ## 📡 Topics MQTT
 
