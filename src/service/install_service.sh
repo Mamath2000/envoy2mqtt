@@ -4,6 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_FILE="$SCRIPT_DIR/envoy2mqtt.service"
+APP_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SYSTEMD_DIR="/etc/systemd/system"
 
 # Couleurs
@@ -37,7 +38,7 @@ echo -e "${YELLOW}Répertoire home: $REAL_HOME${NC}"
 TMP_SERVICE="/tmp/envoy2mqtt.service"
 sed -e "s|User=pi|User=$REAL_USER|g" \
     -e "s|Group=pi|Group=$REAL_USER|g" \
-    -e "s|{WorkingDirectory}|$SCRIPT_DIR|g" \
+    -e "s|{WorkingDirectory}|$APP_ROOT|g" \
     "$SERVICE_FILE" > "$TMP_SERVICE"
 
 # Copier le fichier service
