@@ -14,4 +14,4 @@ ERROR_TOKEN_INVALID = "Token invalide"
 ERROR_TOKEN_MISSING = "Token manquant"
 
 # Configuration
-TOKEN_REFRESH_INTERVAL = 10  # minutes
+TOKEN_REFRESH_INTERVAL = 60  # minutes
