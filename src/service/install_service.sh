@@ -37,9 +37,7 @@ echo -e "${YELLOW}Répertoire home: $REAL_HOME${NC}"
 TMP_SERVICE="/tmp/envoy2mqtt.service"
 sed -e "s|User=pi|User=$REAL_USER|g" \
     -e "s|Group=pi|Group=$REAL_USER|g" \
-    -e "s|WorkingDirectory=/home/mamath/envoy|WorkingDirectory=$SCRIPT_DIR|g" \
-    -e "s|Environment=PATH=/home/mamath/envoy/venv/bin|Environment=PATH=$SCRIPT_DIR/venv/bin|g" \
-    -e "s|ExecStart=/home/mamath/envoy/venv/bin/python /home/mamath/envoy/envoy2mqtt.py|ExecStart=$SCRIPT_DIR/venv/bin/python $SCRIPT_DIR/envoy2mqtt.py|g" \
+    -e "s|{WorkingDirectory}|$SCRIPT_DIR|g" \
     "$SERVICE_FILE" > "$TMP_SERVICE"
 
 # Copier le fichier service

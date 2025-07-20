@@ -7,9 +7,9 @@ Wants=network.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/home/mamath/envoy
-Environment=PATH=/home/mamath/envoy/venv/bin
-ExecStart=/home/mamath/envoy/venv/bin/python /home/mamath/envoy/envoy2mqtt.py
+WorkingDirectory={WorkingDirectory}
+Environment=PATH={WorkingDirectory}/venv/bin
+ExecStart={WorkingDirectory}/venv/bin/python {WorkingDirectory}/src/main.py
 Restart=always
 RestartSec=10
 
