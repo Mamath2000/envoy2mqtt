@@ -19,18 +19,18 @@ from typing import Dict, Any, Optional
 import aiohttp
 import aiomqtt
 
-from envoy_api import EnvoyAPI
-import config
+from src.envoy_api import EnvoyAPI
+import src.config.config as config
 import os
 
-from ha_discovery import publish_ha_autodiscovery_dynamic 
+from src.utils.ha_discovery import publish_ha_autodiscovery_dynamic
 
 # Désactiver les warnings SSL pour les certificats auto-signés de l'Envoy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Configuration du logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Temporairement DEBUG pour diagnostiquer le téléinfo
+    level=getattr(logging, config.LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 _LOGGER = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ class EnvoyMQTTService:
             'prod_eim_whLifetime',
             'grid_eim_whLifetime',
             'eco_eim_whLifetime',
+            'import_eim_whLifetime'
         ]
         
         # Stockage des références minuit (chargées depuis MQTT)
@@ -85,7 +86,7 @@ class EnvoyMQTTService:
         }
 
         # Charger les noms des capteurs Home Assistant depuis ha-sensors-name.json
-        ha_sensors_file = os.path.join(os.path.dirname(__file__), "ha_device/ha-sensors-name.json")
+        ha_sensors_file = os.path.join(os.path.dirname(__file__), "../ha_device/ha-sensors-name.json")
         try:
             with open(ha_sensors_file, "r", encoding="utf-8") as f:
                 self.ha_sensors_name = json.load(f)
@@ -404,5 +405,5 @@ async def main():
         await service.stop()
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
