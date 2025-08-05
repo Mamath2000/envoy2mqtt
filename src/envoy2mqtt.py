@@ -19,12 +19,12 @@ from typing import Dict, Any, Optional
 import aiohttp
 import aiomqtt
 
-from src.envoy_api import EnvoyAPI
-import src.config.config as config
+from envoy_api import EnvoyAPI
+import config.config as config
 import os
 
-from src.utils.ha_discovery import publish_ha_autodiscovery_dynamic
-from src.utils.energy_sensors import publish_pv_production_sensors, publish_energy_sensor_discovery,publish_consumption_sensors
+from utils.ha_discovery import publish_ha_autodiscovery_dynamic
+from utils.energy_sensors import publish_pv_production_sensors, publish_energy_sensor_discovery,publish_consumption_sensors
 
 # Désactiver les warnings SSL pour les certificats auto-signés de l'Envoy
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
