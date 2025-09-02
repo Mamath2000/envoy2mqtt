@@ -51,10 +51,9 @@ async def publish_pv_production_sensors(mqtt_client, topic, data):
         data: dict contenant les valeurs des capteurs
     """
 
-    power = data.get("prod_eim_wNow", 0)
     pv_data = {
         "energy": data.get("prod_eim_kwhLifetime"),
-        "power": power if power >= 5 else 0,
+        "power": data.get("prod_eim_wNow", 0),
         "facteur_de_puiss": data.get("prod_eim_pwrFactor"),
         "voltage": data.get("prod_eim_voltage"),
         "current": data.get("prod_eim_current"),

@@ -342,8 +342,10 @@ class EnvoyMQTTService:
                 # Publier chaque champ dans un topic séparé
                 for field, value in raw_data.items():
                     topic = f"{self.topic_raw}/{field}"
+                    if (field == "prod_eim_wNow" and value < 5): 
+                        value = 0
                     await self._mqtt_client.publish(topic, json.dumps(value))
-                                
+
                 # Calculer le temps d'attente pour maintenir l'intervalle configuré
                 elapsed = time.time() - start_time
                 sleep_time = max(0, self.raw_data_interval - elapsed)
