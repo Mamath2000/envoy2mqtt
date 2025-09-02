@@ -343,8 +343,9 @@ class EnvoyMQTTService:
                 for field, value in raw_data.items():
                     topic = f"{self.topic_raw}/{field}"
                     if (field == "prod_eim_wNow" and value < 5): 
-                        value = 0
-                    await self._mqtt_client.publish(topic, json.dumps(value))
+                        await self._mqtt_client.publish(topic, 0)
+                    else:
+                        await self._mqtt_client.publish(topic, value)
 
                 # Calculer le temps d'attente pour maintenir l'intervalle configuré
                 elapsed = time.time() - start_time
