@@ -94,7 +94,7 @@ async def publish_ha_autodiscovery_dynamic(mqtt_client, device, topic_data, fiel
             "expire_after": sensor_def.get("expire_after", 120),
             "value_template": _value_template_for(sensor_def),
             "unique_id": f"envoy_{serial}_{field}",
-            "default_entity_id": object_id,
+            "object_id": object_id,
             "force_update": True,
             "has_entity_name": True,
             "payload_on": sensor_def.get("payload_on"),

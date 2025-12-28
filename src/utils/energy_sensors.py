@@ -18,7 +18,7 @@ async def publish_energy_sensor_discovery(mqtt_client, base_topic, name, field):
     discovery_topic = f"homeassistant/sensor/{sensor_id}/{field}/config"
     payload = {
         "unique_id": f"{sensor_id}_{field}",
-        "default_entity_id": f"{sensor_id}_{field}",
+        "object_id": f"{sensor_id}_{field}",
         "device": {
             "identifiers": [sensor_id],
             "model": "Envoy Meter S",
